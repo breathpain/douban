@@ -1,4 +1,4 @@
-"""Parsers for Douban list/search pages."""
+"""Parsers for Douban list/search and movie detail pages."""
 
 from __future__ import annotations
 
@@ -15,6 +15,21 @@ except ModuleNotFoundError as exc:  # pragma: no cover - environment guard
     ) from exc
 
 
+INFO_LABELS = (
+    "导演",
+    "编剧",
+    "主演",
+    "类型",
+    "官方网站",
+    "制片国家/地区",
+    "语言",
+    "上映日期",
+    "片长",
+    "又名",
+    "IMDb",
+)
+
+
 @dataclass
 class DoubanItem:
     title: str
@@ -25,6 +40,16 @@ class DoubanItem:
     image_url: str = ""
     source_page: str = ""
     image_file: str = ""
+    director: str = ""
+    screenwriter: str = ""
+    actors: str = ""
+    genres: str = ""
+    country: str = ""
+    language: str = ""
+    release_date: str = ""
+    runtime: str = ""
+    imdb: str = ""
+    detail_error: str = ""
 
     def to_dict(self) -> dict[str, str]:
         return asdict(self)
@@ -38,6 +63,55 @@ def parse_douban_items(html: str, source_url: str) -> list[DoubanItem]:
     if items:
         return items
     return list(_parse_generic_cards(soup, source_url))
+
+
+def has_movie_detail_info(html: str) -> bool:
+    soup = BeautifulSoup(html, "lxml")
+    return bool(soup.select_one("#info"))
+
+
+def enrich_movie_detail(item: DoubanItem, html: str) -> DoubanItem:
+    """Fill a list item with fields parsed from a Douban movie detail page."""
+
+    soup = BeautifulSoup(html, "lxml")
+    info = soup.select_one("#info")
+    if not info:
+        page_title = _first_text(soup, "title")
+        item.detail_error = f"detail page missing #info, page_title={page_title[:80]}"
+        return item
+
+    title = _first_text(soup, "h1 span[property='v:itemreviewed']")
+    if title:
+        item.title = title
+
+    rating = _first_text(soup, "strong.rating_num")
+    if rating:
+        item.rating = rating
+
+    votes = _first_text(soup, "span[property='v:votes']")
+    if votes:
+        item.comment_count = votes
+
+    summary = _first_text(soup, "#link-report-intra span[property='v:summary']")
+    if summary:
+        item.summary = _normalize_space(summary)
+
+    image = _first_attr(soup, "#mainpic img", "src")
+    if image:
+        item.image_url = image
+
+    item.director = _join_texts(soup, "[rel='v:directedBy']") or _info_label(soup, "导演")
+    item.screenwriter = _info_label(soup, "编剧")
+    item.actors = _join_texts(soup, "[rel='v:starring']") or _info_label(soup, "主演")
+    item.genres = _join_texts(soup, "[property='v:genre']") or _info_label(soup, "类型")
+    item.country = _info_label(soup, "制片国家/地区")
+    item.language = _info_label(soup, "语言")
+    item.release_date = _join_texts(soup, "[property='v:initialReleaseDate']") or _info_label(
+        soup, "上映日期"
+    )
+    item.runtime = _first_text(soup, "[property='v:runtime']") or _info_label(soup, "片长")
+    item.imdb = _info_label(soup, "IMDb")
+    return item
 
 
 def _parse_movie_top250(soup: BeautifulSoup, source_url: str) -> Iterable[DoubanItem]:
@@ -111,3 +185,26 @@ def _first_attr(card: Tag | BeautifulSoup, selector: str, attr: str) -> str:
 def _numbers_only(text: str) -> str:
     match = re.search(r"[\d,]+", text)
     return match.group(0).replace(",", "") if match else text
+
+
+def _join_texts(soup: BeautifulSoup, selector: str) -> str:
+    values = [node.get_text(" ", strip=True) for node in soup.select(selector)]
+    return " / ".join(value for value in values if value)
+
+
+def _info_label(soup: BeautifulSoup, label: str) -> str:
+    info = soup.select_one("#info")
+    if not info:
+        return ""
+
+    text = info.get_text(" ", strip=True)
+    next_labels = "|".join(re.escape(item) for item in INFO_LABELS)
+    pattern = rf"{re.escape(label)}\s*:?\s*(.+?)(?=(?:{next_labels})\s*:|$)"
+    match = re.search(pattern, text, flags=re.S)
+    if not match:
+        return ""
+    return _normalize_space(match.group(1))
+
+
+def _normalize_space(text: str) -> str:
+    return re.sub(r"\s+", " ", text).strip()
