@@ -11,7 +11,13 @@ from .anti_spider import polite_sleep
 from .config import CrawlConfig
 from .http_client import BlockedByDoubanError, DoubanHttpClient, HttpResult
 from .image_downloader import download_image
-from .parser import DoubanItem, enrich_movie_detail, has_movie_detail_info, parse_douban_items
+from .parser import (
+    DoubanItem,
+    enrich_movie_detail,
+    has_movie_detail_info,
+    parse_douban_items,
+    parse_movie_comments,
+)
 from .selenium_renderer import SeleniumRenderer
 
 
@@ -75,9 +81,33 @@ class DoubanCrawler:
                 if renderer and not has_movie_detail_info(result.text):
                     result = renderer.render(item.url)
                 enrich_movie_detail(item, result.text)
+                self._crawl_comments(item, result.text, renderer)
             except Exception as exc:
                 item.detail_error = str(exc)
             polite_sleep(self.config.delay_min, self.config.delay_max)
+
+    def _crawl_comments(
+        self,
+        item: DoubanItem,
+        detail_html: str,
+        renderer: SeleniumRenderer | None,
+    ) -> None:
+        if self.config.comment_limit <= 0:
+            return
+
+        comments = parse_movie_comments(detail_html, self.config.comment_limit)
+        if len(comments) < self.config.comment_limit:
+            comments_url = item.url.rstrip("/") + "/comments?" + urlencode(
+                {"limit": self.config.comment_limit, "status": "P", "sort": "new_score"}
+            )
+            try:
+                result = self._fetch(comments_url, renderer)
+                comments = parse_movie_comments(result.text, self.config.comment_limit)
+            except Exception as exc:
+                if not item.detail_error:
+                    item.detail_error = f"comments error: {exc}"
+
+        item.short_comments = "\n".join(comments[: self.config.comment_limit])
 
 
 def save_items(items: list[DoubanItem], output_dir: Path) -> tuple[Path, Path]:
