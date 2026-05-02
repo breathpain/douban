@@ -44,8 +44,12 @@ CREATE TABLE IF NOT EXISTS movies (
 CREATE_COMMENTS_TABLE_SQL = """
 CREATE TABLE IF NOT EXISTS comments (
     id           INT AUTO_INCREMENT PRIMARY KEY,
-    movie_id     INT       NOT NULL,
-    raw_comment  TEXT      NOT NULL,
+    movie_id     INT           NOT NULL,
+    `user`       VARCHAR(255)  NOT NULL DEFAULT '',
+    rating       VARCHAR(50)   NOT NULL DEFAULT '',
+    comment_time VARCHAR(100)  NOT NULL DEFAULT '',
+    helpful      VARCHAR(20)   NOT NULL DEFAULT '',
+    comment      TEXT,
     created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (movie_id) REFERENCES movies(id) ON DELETE CASCADE,
     INDEX idx_movie_id (movie_id)
