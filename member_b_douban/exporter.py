@@ -41,19 +41,27 @@ def export_backup(cfg: MySQLConfig) -> tuple[Path, Path, Path]:
 
 
 def _fetch_movies_with_comments(cfg: MySQLConfig) -> list[dict[str, Any]]:
-    """Fetch every movie row and attach its comments as a nested list."""
+    """Fetch every movie row and attach its comments as a nested list of dicts."""
     conn = get_dict_connection(cfg)
     try:
         with conn.cursor() as cur:
             cur.execute("SELECT * FROM movies ORDER BY id")
             movies = list(cur.fetchall())
 
-            cur.execute("SELECT movie_id, raw_comment FROM comments ORDER BY id")
-            comments_by_movie: dict[int, list[str]] = {}
+            cur.execute(
+                "SELECT movie_id, `user`, rating, comment_time, helpful, comment "
+                "FROM comments ORDER BY id"
+            )
+            comments_by_movie: dict[int, list[dict[str, Any]]] = {}
             for row in cur.fetchall():
-                comments_by_movie.setdefault(row["movie_id"], []).append(
-                    row["raw_comment"]
-                )
+                comment_dict = {
+                    "user": row["user"],
+                    "rating": row["rating"],
+                    "comment_time": row["comment_time"],
+                    "helpful": row["helpful"],
+                    "comment": row["comment"],
+                }
+                comments_by_movie.setdefault(row["movie_id"], []).append(comment_dict)
 
         for movie in movies:
             movie["comments"] = comments_by_movie.get(movie["id"], [])
@@ -79,7 +87,7 @@ def _write_movies_csv(movies: list[dict[str, Any]], path: Path) -> None:
 
 
 def _write_comments_csv(movies: list[dict[str, Any]], path: Path) -> None:
-    fieldnames = ["movie_id", "title", "raw_comment"]
+    fieldnames = ["movie_id", "title", "user", "rating", "comment_time", "helpful", "comment"]
     with path.open("w", encoding="utf-8-sig", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
@@ -88,5 +96,9 @@ def _write_comments_csv(movies: list[dict[str, Any]], path: Path) -> None:
                 writer.writerow({
                     "movie_id": movie["id"],
                     "title": movie["title"],
-                    "raw_comment": comment,
+                    "user": comment["user"],
+                    "rating": comment["rating"],
+                    "comment_time": comment["comment_time"],
+                    "helpful": comment["helpful"],
+                    "comment": comment["comment"],
                 })
