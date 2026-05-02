@@ -23,7 +23,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--cookie", default=None, help="Douban cookie string for logged-in pages.")
     parser.add_argument("--use-selenium", action="store_true", help="Enable Selenium fallback.")
     parser.add_argument("--show-browser", action="store_true", help="Run Selenium with visible Chrome.")
+    parser.add_argument("--driver-path", default=None, help="Path to chromedriver.exe.")
     parser.add_argument("--no-images", action="store_true", help="Skip image download.")
+    parser.add_argument("--no-details", action="store_true", help="Skip movie detail pages.")
     parser.add_argument("--delay-min", type=float, default=1.2, help="Minimum delay seconds.")
     parser.add_argument("--delay-max", type=float, default=3.5, help="Maximum delay seconds.")
     return parser
@@ -39,7 +41,9 @@ def main() -> None:
         cookie=args.cookie,
         use_selenium=args.use_selenium,
         selenium_headless=not args.show_browser,
+        chrome_driver_path=args.driver_path,
         download_images=not args.no_images,
+        crawl_details=not args.no_details,
         delay_min=args.delay_min,
         delay_max=args.delay_max,
     )
