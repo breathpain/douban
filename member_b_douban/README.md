@@ -1,95 +1,137 @@
-# 豆瓣采集项目 - 成员A模块
+# 豆瓣采集项目 - 成员B模块
 
-本目录完成成员A任务：以豆瓣网站为主，提供基础 `requests` 爬虫、Selenium 动态页面兜底、图片下载，以及基础反爬策略实现。模块输出 JSON 和 CSV，方便成员B后续接 Scrapy/MySQL Pipeline，成员C后续做分析和可视化。
+本模块为成员A爬虫提供 **MySQL 数据持久化** 支持，同时实现数据存在性校验（跳过已爬取内容）和备份导出功能。
 
 ## 功能范围
 
-- `requests` 基础采集：复用 Session、设置 Referer/Accept-Language、超时、重试。
-- Selenium 动态处理：可选 Chrome 渲染，用于动态页面或普通请求遇到反爬后的兜底。
-- 图片下载：下载豆瓣条目的封面图，按 URL 哈希命名，避免重复覆盖。
-- 详情页采集：进入每部电影详情页，补充导演、编剧、主演、类型、国家、语言、上映日期、片长、IMDb 等字段。
-- 反爬策略：随机 User-Agent、随机延迟、Cookie 注入、代理配置入口、异常状态识别。
-- 数据落盘：同时生成 `douban_items.json` 和 `douban_items.csv`。
+- **MySQL 双表存储**：自动创建 `movies` 主表 + `comments` 短评表，通过外键关联，`ON DELETE CASCADE`
+- **数据去重**：按 `url` 唯一键防重复插入
+- **跳过已爬取**：与 `member_a_douban` 集成，`--skip-crawled` 参数可在数据已存在时跳过爬取，直接从 MySQL 加载导出
+- **备份导出**：从 MySQL 读取数据，生成嵌套 JSON + 两张 CSV（movies + comments 分开）作为数据备份
 
-## 安装依赖
+## 模块结构
+
+```
+member_b_douban/
+├── __init__.py      统一入口：save_to_mysql / has_existing_data / load_and_export
+├── config.py        MySQLConfig 数据类（连接参数 + 备份目录）
+├── database.py      建库建表（movies + comments 两张 InnoDB 表）
+├── repository.py    DAO 层：插入数据、查询计数/URL存在性
+├── exporter.py      从 MySQL 导出 JSON / CSV 备份文件
+└── README.md        本文件
+```
+
+## 环境要求
+
+- Python 3.10+
+- MySQL 8.0+ 服务端已安装并运行
+- 依赖包：`pymysql` + `cryptography`
+
+```powershell
+pip install pymysql cryptography
+```
+
+或使用项目根目录的 `requirements.txt` 统一安装：
 
 ```powershell
 pip install -r requirements.txt
 ```
 
-如果要使用 Selenium，需要本机已经安装 Chrome，并且 Selenium 能找到匹配的 ChromeDriver。
+## 数据库表结构
 
-如果当前环境提示找不到 `chromedriver`，先下载和 Chrome 主版本一致的 `chromedriver.exe`，然后运行时指定路径：
+### movies（主表）
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| id | INT AUTO_INCREMENT | 主键 |
+| title | VARCHAR(255) | 电影标题 |
+| url | VARCHAR(512) UNIQUE | 详情页 URL（去重依据） |
+| rating | VARCHAR(10) | 评分 |
+| comment_count | VARCHAR(20) | 评价人数 |
+| summary | TEXT | 剧情简介 |
+| image_url / image_file | VARCHAR(512) | 封面图 URL / 本地路径 |
+| director / screenwriter / actors | VARCHAR/TEXT | 导演 / 编剧 / 演员 |
+| genres / country / language | VARCHAR(255) | 类型 / 国家 / 语言 |
+| release_date / runtime | VARCHAR(255) | 上映日期 / 片长 |
+| imdb | VARCHAR(50) | IMDb 编号 |
+| detail_error | TEXT | 详情页采集错误信息 |
+| created_at | TIMESTAMP | 记录创建时间 |
+
+### comments（从表）
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| id | INT AUTO_INCREMENT | 主键 |
+| movie_id | INT NOT NULL | 外键 → movies(id) |
+| raw_comment | TEXT NOT NULL | 单条短评原文 |
+| created_at | TIMESTAMP | 记录创建时间 |
+
+外键约束：`FOREIGN KEY (movie_id) REFERENCES movies(id) ON DELETE CASCADE`
+
+## 使用方式
+
+### 1. 通过 member_a_douban 的 CLI 调用（推荐）
+
+直接使用成员A的命令行入口，传入 `--save-mysql` 即可：
 
 ```powershell
-python -m member_a_douban.cli --mode top250 --max-pages 1 --use-selenium --show-browser --driver-path "D:\tools\chromedriver.exe"
+# 爬取 Top250 第1页并存入 MySQL
+python -m member_a_douban.cli --mode top250 --max-pages 1 --save-mysql
+
+# 启用跳过已爬取：如果 MySQL 已有数据则跳过爬取
+python -m member_a_douban.cli --mode top250 --max-pages 1 --save-mysql --skip-crawled
+
+# 自定义 MySQL 连接参数
+python -m member_a_douban.cli --mode top250 --max-pages 1 --save-mysql `
+    --mysql-host 127.0.0.1 --mysql-port 3306 `
+    --mysql-user root --mysql-password 123456 --mysql-database douban
 ```
 
-## 运行示例
+### 2. 直接导入 Python 代码
 
-采集豆瓣电影 Top250 第 1 页：
+```python
+from member_b_douban import save_to_mysql, has_existing_data, load_and_export
 
-```powershell
-python -m member_a_douban.cli --mode top250 --max-pages 1
-```
+# 检查 MySQL 是否已有数据
+if not has_existing_data(host="localhost", database="douban"):
+    # 爬取数据...
+    items = [...]  # list[dict]
+    save_to_mysql(items)
 
-只采集列表页，不进入详情页：
-
-```powershell
-python -m member_a_douban.cli --mode top250 --max-pages 1 --no-details
-```
-
-遇到动态内容或普通请求被拦截时，启用 Selenium：
-
-```powershell
-python -m member_a_douban.cli --mode top250 --max-pages 1 --use-selenium
-```
-
-采集自定义豆瓣页面：
-
-```powershell
-python -m member_a_douban.cli --mode urls --url "https://movie.douban.com/top250"
-```
-
-带 Cookie 运行：
-
-```powershell
-python -m member_a_douban.cli --cookie "bid=xxxx; dbcl2=xxxx"
+# 从 MySQL 加载并导出文件
+json_path, csv_path, bk_json, bk_csv, bk_cmts = load_and_export(
+    output_dir="data/member_a",
+)
 ```
 
 ## 输出文件
 
-默认输出到：
+运行 `--save-mysql` 后，默认在以下位置生成备份文件：
 
-- `data/member_a/douban_items.json`
-- `data/member_a/douban_items.csv`
-- `data/member_a/images/`
+### MySQL 备份（data/member_b/backup/）
 
-字段包括：
+| 文件 | 格式 | 内容 |
+|---|---|---|
+| `douban_movies.json` | JSON 嵌套 | 每条电影记录内嵌 `comments` 数组 |
+| `douban_movies.csv` | CSV | 电影字段（不含评论） |
+| `douban_comments.csv` | CSV | 评论记录（含 movie_id、电影标题） |
 
-- `title`
-- `url`
-- `rating`
-- `comment_count`
-- `summary`
-- `image_url`
-- `source_page`
-- `image_file`
-- `director`
-- `screenwriter`
-- `actors`
-- `genres`
-- `country`
-- `language`
-- `release_date`
-- `runtime`
-- `imdb`
-- `detail_error`
+### 成员A输出（data/member_a/）
 
-## 分工说明
+| 文件 | 格式 | 内容 |
+|---|---|---|
+| `douban_items.json` | JSON | 与爬虫直接输出格式一致 |
+| `douban_items.csv` | CSV | 与爬虫直接输出格式一致 |
 
-成员A当前代码主要位于 `member_a_douban/`，可在报告中统计为独立模块。成员B可以读取 CSV/JSON 后写入 MySQL，或复用 `parser.py` 的字段结构改造成 Scrapy Item。成员C可以直接使用输出文件做数据分析、情感分析和图表生成。
+当 `--skip-crawled` 启用时，这些文件改为从 MySQL 加载数据生成，而非爬虫实时输出。
+
+## 与成员A的集成
+
+成员A的 `cli.py` 通过参数方式与本模块对接：
+
+1. `--save-mysql` — 爬取完成后调用 `save_to_mysql()` 写入 MySQL 并导出备份
+2. `--skip-crawled` — 爬取前调用 `has_existing_data()` 检查，数据已存在则调用 `load_and_export()` 直接从 MySQL 加载导出，跳过网络请求
 
 ## 合规提醒
 
-运行时请降低频率，优先采集公开列表页，不要绕过登录、验证码或权限控制。若豆瓣返回验证码或访问频繁提示，应停止采集或改用更低频率。
+请在合理频率下使用，避免对豆瓣服务造成压力。若遇到访问频繁提示，应降低爬取频率或暂停采集。
