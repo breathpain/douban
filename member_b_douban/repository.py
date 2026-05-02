@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from .config import MySQLConfig
 from .database import create_tables, get_connection, init_database
 
@@ -53,7 +55,8 @@ INSERT_MOVIE_SQL = """
 """
 
 INSERT_COMMENT_SQL = """
-    INSERT INTO comments (movie_id, raw_comment) VALUES (%s, %s)
+    INSERT INTO comments (movie_id, `user`, rating, comment_time, helpful, comment)
+    VALUES (%s, %s, %s, %s, %s, %s)
 """
 
 
@@ -86,12 +89,59 @@ def _upsert_movie(cur, item: dict) -> int | None:
     return cur.lastrowid
 
 
+def _parse_comment_line(line: str) -> dict[str, str]:
+    """
+    Parse a single raw comment line into its component fields.
+
+    Expected format:
+        用户：xxx | 评分：xxx | 时间：xxx | 有用：xxx | 评论：xxx
+    Some fields (e.g. 评分) may be missing.
+    """
+    fields = {
+        "用户": "user",
+        "评分": "rating",
+        "时间": "comment_time",
+        "有用": "helpful",
+        "评论": "comment",
+    }
+    result: dict[str, str] = {
+        "user": "",
+        "rating": "",
+        "comment_time": "",
+        "helpful": "",
+        "comment": "",
+    }
+
+    key_pattern = "|".join(re.escape(k) for k in fields)
+    pattern = re.compile(
+        rf"(?:^|\|\s*)({key_pattern})：(.+?)(?=\s*\|\s*(?:{key_pattern})：|\s*$)"
+    )
+
+    for m in pattern.finditer(line):
+        cn_key = m.group(1)
+        value = m.group(2).strip()
+        result[fields[cn_key]] = value
+
+    return result
+
+
 def _save_comments(cur, movie_id: int, raw_comments: str) -> None:
-    """Split ``short_comments`` by newline and insert each into the comments table."""
+    """Split ``short_comments`` by newline, parse each, and insert into the comments table."""
     if not raw_comments:
         return
 
     for line in raw_comments.split("\n"):
         line = line.strip()
         if line:
-            cur.execute(INSERT_COMMENT_SQL, (movie_id, line))
+            parsed = _parse_comment_line(line)
+            cur.execute(
+                INSERT_COMMENT_SQL,
+                (
+                    movie_id,
+                    parsed["user"],
+                    parsed["rating"],
+                    parsed["comment_time"],
+                    parsed["helpful"],
+                    parsed["comment"],
+                ),
+            )
