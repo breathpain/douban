@@ -32,6 +32,7 @@ class CrawlConfig:
     chrome_driver_path: str | None = None
     download_images: bool = True
     crawl_details: bool = True
+    comment_limit: int = 3
     proxies: dict[str, str] | None = None
     cookie: str | None = None
     user_agents: tuple[str, ...] = field(default_factory=lambda: DEFAULT_USER_AGENTS)
