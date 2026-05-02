@@ -13,9 +13,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Member A Douban crawler")
     parser.add_argument(
         "--mode",
-        choices=("top250", "urls"),
+        choices=("top250", "urls", "import"),
         default="top250",
-        help="Crawl Douban movie Top250 or custom URLs.",
+        help="Crawl mode (top250 / urls) or import existing JSON/CSV files into MySQL.",
     )
     parser.add_argument("--url", action="append", default=[], help="Custom Douban URL.")
     parser.add_argument("--max-pages", type=int, default=1, help="Maximum pages to crawl.")
@@ -67,13 +67,30 @@ def main() -> None:
         if not args.url:
             raise SystemExit("--mode urls requires at least one --url")
         items = crawler.crawl_urls(args.url)
+    elif args.mode == "import":
+        items = []
+        json_file = output_dir / "douban_items.json"
+        if not json_file.exists():
+            raise SystemExit(f"JSON file not found: {json_file}")
+        import json as _json
+        rows = _json.loads(json_file.read_text(encoding="utf-8"))
+        from .parser import DoubanItem
+        for row in rows:
+            item = DoubanItem(title=row.get("title", ""), url=row.get("url", ""))
+            for key, val in row.items():
+                if hasattr(item, key):
+                    setattr(item, key, val or "")
+            items.append(item)
+        print(f"loaded {len(items)} items from {json_file}")
+        json_path, csv_path = save_items(items, config.output_dir)
+        print(f"json: {json_path}")
+        print(f"csv: {csv_path}")
     else:
         items = crawler.crawl_movie_top250()
-
-    json_path, csv_path = save_items(items, config.output_dir)
-    print(f"saved {len(items)} items")
-    print(f"json: {json_path}")
-    print(f"csv: {csv_path}")
+        json_path, csv_path = save_items(items, config.output_dir)
+        print(f"saved {len(items)} items")
+        print(f"json: {json_path}")
+        print(f"csv: {csv_path}")
 
     if args.save_mysql:
         try:
