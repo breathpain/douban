@@ -7,10 +7,11 @@ import json
 from pathlib import Path
 from urllib.parse import urlencode
 
+from .anti_spider import polite_sleep
 from .config import CrawlConfig
 from .http_client import BlockedByDoubanError, DoubanHttpClient, HttpResult
 from .image_downloader import download_image
-from .parser import DoubanItem, parse_douban_items
+from .parser import DoubanItem, enrich_movie_detail, has_movie_detail_info, parse_douban_items
 from .selenium_renderer import SeleniumRenderer
 
 
@@ -30,6 +31,8 @@ class DoubanCrawler:
             for url in urls[: self.config.max_pages]:
                 result = self._fetch(url, renderer)
                 items = parse_douban_items(result.text, result.url)
+                if self.config.crawl_details:
+                    self._crawl_details(items, renderer)
                 if self.config.download_images:
                     self._download_images(items)
                 all_items.extend(items)
@@ -63,6 +66,19 @@ class DoubanCrawler:
             if path:
                 item.image_file = str(path)
 
+    def _crawl_details(self, items: list[DoubanItem], renderer: SeleniumRenderer | None) -> None:
+        for item in items:
+            if not item.url:
+                continue
+            try:
+                result = self._fetch(item.url, renderer)
+                if renderer and not has_movie_detail_info(result.text):
+                    result = renderer.render(item.url)
+                enrich_movie_detail(item, result.text)
+            except Exception as exc:
+                item.detail_error = str(exc)
+            polite_sleep(self.config.delay_min, self.config.delay_max)
+
 
 def save_items(items: list[DoubanItem], output_dir: Path) -> tuple[Path, Path]:
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -80,4 +96,3 @@ def save_items(items: list[DoubanItem], output_dir: Path) -> tuple[Path, Path]:
         writer.writerows(rows)
 
     return json_path, csv_path
-
