@@ -49,6 +49,7 @@ class DoubanItem:
     release_date: str = ""
     runtime: str = ""
     imdb: str = ""
+    short_comments: str = ""
     detail_error: str = ""
 
     def to_dict(self) -> dict[str, str]:
@@ -112,6 +113,39 @@ def enrich_movie_detail(item: DoubanItem, html: str) -> DoubanItem:
     item.runtime = _first_text(soup, "[property='v:runtime']") or _info_label(soup, "片长")
     item.imdb = _info_label(soup, "IMDb")
     return item
+
+
+def parse_movie_comments(html: str, limit: int) -> list[str]:
+    """Parse Douban short comments from detail or comments pages."""
+
+    if limit <= 0:
+        return []
+
+    soup = BeautifulSoup(html, "lxml")
+    comments: list[str] = []
+    for node in soup.select(".comment-item"):
+        text = _first_text(node, ".short")
+        if not text:
+            continue
+        author = _first_text(node, ".comment-info a")
+        rating = _comment_rating(node)
+        date = _first_text(node, ".comment-time")
+        votes = _first_text(node, ".votes")
+
+        parts = []
+        if author:
+            parts.append(f"用户：{author}")
+        if rating:
+            parts.append(f"评分：{rating}")
+        if date:
+            parts.append(f"时间：{date}")
+        if votes:
+            parts.append(f"有用：{votes}")
+        parts.append(f"评论：{_normalize_space(text)}")
+        comments.append(" | ".join(parts))
+        if len(comments) >= limit:
+            break
+    return comments
 
 
 def _parse_movie_top250(soup: BeautifulSoup, source_url: str) -> Iterable[DoubanItem]:
@@ -190,6 +224,20 @@ def _numbers_only(text: str) -> str:
 def _join_texts(soup: BeautifulSoup, selector: str) -> str:
     values = [node.get_text(" ", strip=True) for node in soup.select(selector)]
     return " / ".join(value for value in values if value)
+
+
+def _comment_rating(node: Tag) -> str:
+    rating_node = node.select_one(".comment-info .rating")
+    if not rating_node:
+        return ""
+    title = rating_node.get("title")
+    if title:
+        return str(title).strip()
+    classes = " ".join(rating_node.get("class", []))
+    match = re.search(r"allstar(\d+)", classes)
+    if not match:
+        return ""
+    return f"{int(match.group(1)) // 10}星"
 
 
 def _info_label(soup: BeautifulSoup, label: str) -> str:
