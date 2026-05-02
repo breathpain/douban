@@ -29,7 +29,9 @@ class CrawlConfig:
     max_pages: int = 1
     use_selenium: bool = False
     selenium_headless: bool = True
+    chrome_driver_path: str | None = None
     download_images: bool = True
+    crawl_details: bool = True
     proxies: dict[str, str] | None = None
     cookie: str | None = None
     user_agents: tuple[str, ...] = field(default_factory=lambda: DEFAULT_USER_AGENTS)
