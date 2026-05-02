@@ -34,6 +34,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--delay-min", type=float, default=1.2, help="Minimum delay seconds.")
     parser.add_argument("--delay-max", type=float, default=3.5, help="Maximum delay seconds.")
+    parser.add_argument("--save-mysql", action="store_true", help="Store results into MySQL.")
+    parser.add_argument("--mysql-host", default="localhost", help="MySQL host.")
+    parser.add_argument("--mysql-port", type=int, default=3306, help="MySQL port.")
+    parser.add_argument("--mysql-user", default="root", help="MySQL user.")
+    parser.add_argument("--mysql-password", default="123456", help="MySQL password.")
+    parser.add_argument("--mysql-database", default="douban", help="MySQL database name.")
+    parser.add_argument("--mysql-backup-dir", default="data/member_b/backup", help="MySQL backup dir.")
     return parser
 
 
@@ -67,6 +74,26 @@ def main() -> None:
     print(f"saved {len(items)} items")
     print(f"json: {json_path}")
     print(f"csv: {csv_path}")
+
+    if args.save_mysql:
+        try:
+            from member_b_douban import save_to_mysql as member_b_save
+
+            inserted = member_b_save(
+                [item.to_dict() for item in items],
+                host=args.mysql_host,
+                port=args.mysql_port,
+                user=args.mysql_user,
+                password=args.mysql_password,
+                database=args.mysql_database,
+                backup_dir=args.mysql_backup_dir,
+            )
+            print(f"MySQL: inserted {inserted} movies (with comments)")
+            print(f"MySQL backup dir: {args.mysql_backup_dir}")
+        except ImportError:
+            print("Warning: pymysql not installed. Run: pip install pymysql")
+        except Exception as exc:
+            print(f"MySQL error: {exc}")
 
 
 if __name__ == "__main__":
