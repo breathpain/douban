@@ -24,8 +24,8 @@ class CrawlConfig:
     image_dir: Path = Path("data/member_a/images")
     request_timeout: int = 15
     retry_times: int = 3
-    delay_min: float = 1.2
-    delay_max: float = 3.5
+    delay_min: float = 0.5
+    delay_max: float = 1.0
     max_pages: int = 1
     use_selenium: bool = False
     selenium_headless: bool = True
@@ -33,6 +33,7 @@ class CrawlConfig:
     download_images: bool = True
     crawl_details: bool = True
     comment_limit: int = 3
+    detail_workers: int = 1
     proxies: dict[str, str] | None = None
     cookie: str | None = None
     user_agents: tuple[str, ...] = field(default_factory=lambda: DEFAULT_USER_AGENTS)
