@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import json
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from urllib.parse import urlencode
 
@@ -55,9 +56,15 @@ class DoubanCrawler:
         ]
         return self.crawl_urls(urls)
 
-    def _fetch(self, url: str, renderer: SeleniumRenderer | None) -> HttpResult:
+    def _fetch(
+        self,
+        url: str,
+        renderer: SeleniumRenderer | None,
+        client: DoubanHttpClient | None = None,
+    ) -> HttpResult:
+        http_client = client or self.client
         try:
-            return self.client.get(url)
+            return http_client.get(url)
         except (RuntimeError, BlockedByDoubanError):
             if renderer is None:
                 raise
@@ -66,31 +73,77 @@ class DoubanCrawler:
     def _download_images(self, items: list[DoubanItem]) -> None:
         for item in items:
             try:
-                path = download_image(item.image_url, self.config.image_dir, self.config)
+                path = download_image(
+                    item.image_url,
+                    self.config.image_dir,
+                    self.config,
+                    item.title,
+                )
             except Exception:
                 path = None
             if path:
                 item.image_file = str(path)
 
     def _crawl_details(self, items: list[DoubanItem], renderer: SeleniumRenderer | None) -> None:
+        if renderer is None and self.config.detail_workers > 1:
+            self._crawl_details_concurrently(items)
+            return
+
         for item in items:
-            if not item.url:
-                continue
-            try:
-                result = self._fetch(item.url, renderer)
-                if renderer and not has_movie_detail_info(result.text):
-                    result = renderer.render(item.url)
-                enrich_movie_detail(item, result.text)
-                self._crawl_comments(item, result.text, renderer)
-            except Exception as exc:
-                item.detail_error = str(exc)
+            self._crawl_detail_item(item, renderer)
             polite_sleep(self.config.delay_min, self.config.delay_max)
+
+    def _crawl_details_concurrently(self, items: list[DoubanItem]) -> None:
+        with ThreadPoolExecutor(max_workers=self.config.detail_workers) as executor:
+            futures = {
+                executor.submit(
+                    self._crawl_detail_item_with_delay,
+                    item,
+                    DoubanHttpClient(self.config),
+                ): item
+                for item in items
+                if item.url
+            }
+            for future in as_completed(futures):
+                item = futures[future]
+                try:
+                    future.result()
+                except Exception as exc:
+                    item.detail_error = str(exc)
+
+    def _crawl_detail_item_with_delay(
+        self,
+        item: DoubanItem,
+        client: DoubanHttpClient,
+    ) -> None:
+        try:
+            self._crawl_detail_item(item, None, client)
+        finally:
+            polite_sleep(self.config.delay_min, self.config.delay_max)
+
+    def _crawl_detail_item(
+        self,
+        item: DoubanItem,
+        renderer: SeleniumRenderer | None,
+        client: DoubanHttpClient | None = None,
+    ) -> None:
+        if not item.url:
+            return
+        try:
+            result = self._fetch(item.url, renderer, client)
+            if renderer and not has_movie_detail_info(result.text):
+                result = renderer.render(item.url)
+            enrich_movie_detail(item, result.text)
+            self._crawl_comments(item, result.text, renderer, client)
+        except Exception as exc:
+            item.detail_error = str(exc)
 
     def _crawl_comments(
         self,
         item: DoubanItem,
         detail_html: str,
         renderer: SeleniumRenderer | None,
+        client: DoubanHttpClient | None = None,
     ) -> None:
         if self.config.comment_limit <= 0:
             return
@@ -101,7 +154,7 @@ class DoubanCrawler:
                 {"limit": self.config.comment_limit, "status": "P", "sort": "new_score"}
             )
             try:
-                result = self._fetch(comments_url, renderer)
+                result = self._fetch(comments_url, renderer, client)
                 comments = parse_movie_comments(result.text, self.config.comment_limit)
             except Exception as exc:
                 if not item.detail_error:
