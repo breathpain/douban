@@ -93,7 +93,10 @@ def enrich_movie_detail(item: DoubanItem, html: str) -> DoubanItem:
     if votes:
         item.comment_count = votes
 
-    summary = _first_text(soup, "#link-report-intra span[property='v:summary']")
+    # 优先取展开后的完整简介 (span.all)，其次取截断版 (span[property='v:summary'])
+    summary = _first_text(soup, "#link-report-intra .all")
+    if not summary:
+        summary = _first_text(soup, "#link-report-intra span[property='v:summary']")
     if summary:
         item.summary = _normalize_space(summary)
 
