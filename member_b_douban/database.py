@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS movies (
     country         VARCHAR(255) NOT NULL DEFAULT '',
     language        VARCHAR(255) NOT NULL DEFAULT '',
     release_date    VARCHAR(255) NOT NULL DEFAULT '',
-    runtime         VARCHAR(100) NOT NULL DEFAULT '',
+    runtime         INT             DEFAULT NULL,
     imdb            VARCHAR(50)  NOT NULL DEFAULT '',
     detail_error    TEXT,
     created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,

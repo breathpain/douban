@@ -47,12 +47,12 @@ class DoubanItem:
     country: str = ""
     language: str = ""
     release_date: str = ""
-    runtime: str = ""
+    runtime: int | None = None
     imdb: str = ""
     short_comments: str = ""
     detail_error: str = ""
 
-    def to_dict(self) -> dict[str, str]:
+    def to_dict(self) -> dict[str, str | int | None]:
         return asdict(self)
 
 

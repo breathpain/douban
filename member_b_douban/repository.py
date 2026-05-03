@@ -80,7 +80,7 @@ def _upsert_movie(cur, item: dict) -> int | None:
         "country": (item.get("country") or "")[:255],
         "language": (item.get("language") or "")[:255],
         "release_date": (item.get("release_date") or "")[:255],
-        "runtime": (item.get("runtime") or "")[:100],
+        "runtime": item.get("runtime"),
         "imdb": (item.get("imdb") or "")[:50],
         "detail_error": item.get("detail_error") or "",
     }

@@ -6,6 +6,7 @@ import argparse
 import time
 from pathlib import Path
 
+from .cleaner import clean_items
 from .config import CrawlConfig
 from .crawler import DoubanCrawler, save_items
 
@@ -72,6 +73,7 @@ def main() -> None:
     else:
         items = crawler.crawl_movie_top250()
 
+    clean_items(items)
     json_path, csv_path = save_items(items, config.output_dir)
     elapsed = time.perf_counter() - start_time
     avg_time = elapsed / len(items) if items else 0
