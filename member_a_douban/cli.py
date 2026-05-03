@@ -3,21 +3,24 @@
 from __future__ import annotations
 
 import argparse
+import csv
+import json
 import time
 from pathlib import Path
 
 from .cleaner import clean_items
 from .config import CrawlConfig
 from .crawler import DoubanCrawler, save_items
+from .parser import DoubanItem
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Member A Douban crawler")
     parser.add_argument(
         "--mode",
-        choices=("top250", "urls"),
+        choices=("top250", "urls", "import"),
         default="top250",
-        help="Crawl Douban movie Top250 or custom URLs.",
+        help="Crawl Douban movie Top250, custom URLs, or import existing data from JSON/CSV.",
     )
     parser.add_argument("--url", action="append", default=[], help="Custom Douban URL.")
     parser.add_argument("--max-pages", type=int, default=1, help="Maximum pages to crawl.")
@@ -42,6 +45,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--delay-min", type=float, default=1.2, help="Minimum delay seconds.")
     parser.add_argument("--delay-max", type=float, default=3.5, help="Maximum delay seconds.")
+    parser.add_argument(
+        "--save-mysql",
+        action="store_true",
+        help="Save imported items into MySQL (only for --mode import).",
+    )
     return parser
 
 
@@ -65,6 +73,10 @@ def main() -> None:
         delay_max=args.delay_max,
     )
 
+    if args.mode == "import":
+        _run_import(config.output_dir, args.save_mysql)
+        return
+
     crawler = DoubanCrawler(config)
     if args.mode == "urls":
         if not args.url:
@@ -82,6 +94,45 @@ def main() -> None:
     print(f"csv: {csv_path}")
     print(f"elapsed: {elapsed:.2f}s")
     print(f"avg per item: {avg_time:.2f}s")
+
+
+def _run_import(output_dir: Path, save_mysql: bool) -> None:
+    """Import items from local JSON/CSV and optionally write to MySQL."""
+    json_path = output_dir / "douban_items.json"
+    csv_path = output_dir / "douban_items.csv"
+
+    if json_path.exists():
+        with json_path.open("r", encoding="utf-8") as f:
+            raw_data = json.load(f)
+    elif csv_path.exists():
+        with csv_path.open("r", encoding="utf-8-sig") as f:
+            reader = csv.DictReader(f)
+            raw_data = list(reader)
+    else:
+        raise SystemExit(f"no data file found at {output_dir}/douban_items.json or .csv")
+
+    items = []
+    for d in raw_data:
+        # Convert empty runtime strings back to None
+        if "runtime" in d and d["runtime"] == "":
+            d["runtime"] = None
+        items.append(DoubanItem(**d))
+
+    clean_items(items)
+    print(f"loaded {len(items)} items from {json_path if json_path.exists() else csv_path}")
+
+    if save_mysql:
+        try:
+            from member_b_douban import save_to_mysql
+
+            inserted = save_to_mysql([item.to_dict() for item in items])
+            print(f"saved {inserted} items into MySQL")
+            print(f"backup exported to data/member_b/backup/")
+        except ImportError as exc:
+            raise SystemExit(
+                "member_b_douban package not available; "
+                "ensure it is in the Python path."
+            ) from exc
 
 
 if __name__ == "__main__":
