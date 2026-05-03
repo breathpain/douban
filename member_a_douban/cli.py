@@ -48,7 +48,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--save-mysql",
         action="store_true",
-        help="Save imported items into MySQL (only for --mode import).",
+        help="Save items into MySQL after crawling or importing.",
     )
     return parser
 
@@ -87,11 +87,18 @@ def main() -> None:
 
     clean_items(items)
     json_path, csv_path = save_items(items, config.output_dir)
+
+    if args.save_mysql:
+        _save_to_mysql(items)
+
     elapsed = time.perf_counter() - start_time
     avg_time = elapsed / len(items) if items else 0
     print(f"saved {len(items)} items")
     print(f"json: {json_path}")
     print(f"csv: {csv_path}")
+    if args.save_mysql:
+        print(f"saved {len(items)} items into MySQL")
+        print(f"backup exported to data/member_b/backup/")
     print(f"elapsed: {elapsed:.2f}s")
     print(f"avg per item: {avg_time:.2f}s")
 
@@ -122,17 +129,23 @@ def _run_import(output_dir: Path, save_mysql: bool) -> None:
     print(f"loaded {len(items)} items from {json_path if json_path.exists() else csv_path}")
 
     if save_mysql:
-        try:
-            from member_b_douban import save_to_mysql
+        _save_to_mysql(items)
 
-            inserted = save_to_mysql([item.to_dict() for item in items])
-            print(f"saved {inserted} items into MySQL")
-            print(f"backup exported to data/member_b/backup/")
-        except ImportError as exc:
-            raise SystemExit(
-                "member_b_douban package not available; "
-                "ensure it is in the Python path."
-            ) from exc
+
+def _save_to_mysql(items: list[DoubanItem]) -> int:
+    """Save cleaned DoubanItem list into MySQL and export backups."""
+    try:
+        from member_b_douban import save_to_mysql
+
+        inserted = save_to_mysql([item.to_dict() for item in items])
+        print(f"saved {inserted} items into MySQL")
+        print(f"backup exported to data/member_b/backup/")
+        return inserted
+    except ImportError as exc:
+        raise SystemExit(
+            "member_b_douban package not available; "
+            "ensure it is in the Python path."
+        ) from exc
 
 
 if __name__ == "__main__":
