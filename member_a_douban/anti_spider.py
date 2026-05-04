@@ -23,6 +23,14 @@ def choose_user_agent(user_agents: tuple[str, ...]) -> str:
 def polite_sleep(delay_min: float, delay_max: float) -> None:
     time.sleep(random.uniform(delay_min, delay_max))
 
+def choose_proxy(
+    proxies: dict[str, str] | None,
+    proxy_pool: tuple[dict[str, str], ...] = (),
+) -> dict[str, str] | None:
+    if proxy_pool:
+        return random.choice(proxy_pool)
+    return proxies
+
 
 def parse_cookie(cookie: str | None) -> dict[str, str]:
     if not cookie:

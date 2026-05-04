@@ -9,7 +9,7 @@ from pathlib import Path
 
 from .cleaner import clean_items
 from .config import CrawlConfig
-from .crawler import DoubanCrawler, save_items
+from .crawler import DoubanCrawler, expand_paginated_urls, save_items
 from .parser import DoubanItem
 
 
@@ -135,7 +135,7 @@ def main() -> None:
     if args.mode == "urls":
         if not args.url:
             raise SystemExit("--mode urls requires at least one --url")
-        items = crawler.crawl_urls(args.url)
+        items = crawler.crawl_urls(expand_paginated_urls(args.url, config))
     else:
         items = crawler.crawl_movie_top250()
 
