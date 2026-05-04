@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-import json
 import re
 from dataclasses import asdict, dataclass
 from typing import Iterable
 from urllib.parse import urljoin
 
 try:
-    from bs4 import BeautifulSoup, NavigableString, Tag
+    from bs4 import BeautifulSoup, Tag
 except ModuleNotFoundError as exc:  # pragma: no cover - environment guard
     raise ModuleNotFoundError(
         "beautifulsoup4 and lxml are required. Install dependencies with: pip install -r requirements.txt"
@@ -28,17 +27,13 @@ INFO_LABELS = (
     "片长",
     "又名",
     "IMDb",
-    "IMDb链接",
 )
 
 
 @dataclass
 class DoubanItem:
-    rank: str
     title: str
     url: str
-    title_cn: str = ""
-    title_en: str = ""
     rating: str = ""
     comment_count: str = ""
     summary: str = ""
@@ -52,12 +47,12 @@ class DoubanItem:
     country: str = ""
     language: str = ""
     release_date: str = ""
-    runtime: str | None = None
+    runtime: int | None = None
     imdb: str = ""
     short_comments: str = ""
     detail_error: str = ""
 
-    def to_dict(self) -> dict[str, str | None]:
+    def to_dict(self) -> dict[str, str | int | None]:
         return asdict(self)
 
 
@@ -73,7 +68,7 @@ def parse_douban_items(html: str, source_url: str) -> list[DoubanItem]:
 
 def has_movie_detail_info(html: str) -> bool:
     soup = BeautifulSoup(html, "lxml")
-    return bool(soup.select_one("#info") or soup.select_one("script[type='application/ld+json']"))
+    return bool(soup.select_one("#info"))
 
 
 def enrich_movie_detail(item: DoubanItem, html: str) -> DoubanItem:
@@ -82,9 +77,6 @@ def enrich_movie_detail(item: DoubanItem, html: str) -> DoubanItem:
     soup = BeautifulSoup(html, "lxml")
     info = soup.select_one("#info")
     if not info:
-        if _enrich_from_json_ld(item, soup) or _enrich_from_mobile_text(item, soup):
-            item.detail_error = ""
-            return item
         page_title = _first_text(soup, "title")
         item.detail_error = f"detail page missing #info, page_title={page_title[:80]}"
         return item
@@ -101,6 +93,7 @@ def enrich_movie_detail(item: DoubanItem, html: str) -> DoubanItem:
     if votes:
         item.comment_count = votes
 
+    # 优先取展开后的完整简介 (span.all)，其次取截断版 (span[property='v:summary'])
     summary = _first_text(soup, "#link-report-intra .all")
     if not summary:
         summary = _first_text(soup, "#link-report-intra span[property='v:summary']")
@@ -121,8 +114,7 @@ def enrich_movie_detail(item: DoubanItem, html: str) -> DoubanItem:
         soup, "上映日期"
     )
     item.runtime = _first_text(soup, "[property='v:runtime']") or _info_label(soup, "片长")
-    item.imdb = _info_label(soup, "IMDb链接") or _info_label(soup, "IMDb")
-    item.detail_error = ""
+    item.imdb = _info_label(soup, "IMDb")
     return item
 
 
@@ -134,8 +126,8 @@ def parse_movie_comments(html: str, limit: int) -> list[str]:
 
     soup = BeautifulSoup(html, "lxml")
     comments: list[str] = []
-    for node in soup.select(".comment-item, .comment"):
-        text = _first_text(node, ".short, .comment-content")
+    for node in soup.select(".comment-item"):
+        text = _first_text(node, ".short")
         if not text:
             continue
         author = _first_text(node, ".comment-info a")
@@ -163,32 +155,20 @@ def _parse_movie_top250(soup: BeautifulSoup, source_url: str) -> Iterable[Douban
     for card in soup.select(".grid_view li"):
         title_nodes = [node.get_text(strip=True) for node in card.select(".hd .title")]
         title = " ".join(dict.fromkeys(title_nodes)).strip()
-        title_cn = title_nodes[0] if title_nodes else title
-        title_en = " ".join(node.strip(" /") for node in title_nodes[1:] if node.strip(" /"))
         link = _first_attr(card, ".hd a", "href")
-        rank = _first_text(card, ".pic em")
         rating = _first_text(card, ".rating_num")
-        comments = _top250_comment_count(card)
-        summary = _first_text(card, ".inq") or _first_text(card, ".quote .inq")
+        comments = _first_text(card, ".star span:last-child")
+        summary = _first_text(card, ".inq")
         image = _first_attr(card, "img", "src")
-        item_info = _parse_top250_card_info(card)
         if title and link:
             yield DoubanItem(
-                rank=rank,
                 title=title,
                 url=urljoin(source_url, link),
-                title_cn=title_cn,
-                title_en=title_en,
                 rating=rating,
-                comment_count=comments,
+                comment_count=_numbers_only(comments),
                 summary=summary,
                 image_url=image,
                 source_page=source_url,
-                director=item_info.get("director", ""),
-                actors=item_info.get("actors", ""),
-                genres=item_info.get("genres", ""),
-                country=item_info.get("country", ""),
-                release_date=item_info.get("release_date", ""),
             )
 
 
@@ -208,7 +188,6 @@ def _parse_generic_cards(soup: BeautifulSoup, source_url: str) -> Iterable[Douba
                 continue
             seen.add(link)
             yield DoubanItem(
-                rank="",
                 title=title,
                 url=urljoin(source_url, link),
                 rating=_first_text(card, ".rating_nums, .rating_num, .allstar50, .allstar45"),
@@ -217,150 +196,6 @@ def _parse_generic_cards(soup: BeautifulSoup, source_url: str) -> Iterable[Douba
                 image_url=_first_attr(card, "img", "src") or _first_attr(card, "img", "data-src"),
                 source_page=source_url,
             )
-
-
-def _parse_top250_card_info(card: Tag) -> dict[str, str]:
-    info_node = card.select_one(".bd p")
-    if not info_node:
-        return {}
-
-    html = str(info_node).replace("<br/>", "\n").replace("<br>", "\n")
-    text = BeautifulSoup(html, "lxml").get_text("\n", strip=True)
-    lines = [line.strip() for line in text.splitlines() if line.strip()]
-    if not lines:
-        return {}
-
-    result: dict[str, str] = {}
-    people_line = lines[0]
-    meta_line = lines[1] if len(lines) > 1 else ""
-
-    director_match = re.search(r"导演:\s*(.+?)(?=\s+主演:|$)", people_line)
-    if director_match:
-        result["director"] = _normalize_space(director_match.group(1))
-
-    actors_match = re.search(r"主演:\s*(.+)$", people_line)
-    if actors_match:
-        result["actors"] = _normalize_space(actors_match.group(1))
-
-    meta_parts = [part.strip() for part in meta_line.split("/") if part.strip()]
-    if meta_parts:
-        result["release_date"] = meta_parts[0]
-    if len(meta_parts) >= 2:
-        result["country"] = meta_parts[1]
-    if len(meta_parts) >= 3:
-        result["genres"] = " / ".join(meta_parts[2:])
-    return result
-
-
-def _enrich_from_json_ld(item: DoubanItem, soup: BeautifulSoup) -> bool:
-    for node in soup.select("script[type='application/ld+json']"):
-        payload = node.string or node.get_text("", strip=True)
-        if not payload:
-            continue
-        try:
-            data = json.loads(payload)
-        except json.JSONDecodeError:
-            continue
-        candidates = data if isinstance(data, list) else [data]
-        for candidate in candidates:
-            if not isinstance(candidate, dict):
-                continue
-            if _json_ld_type(candidate) not in {"Movie", "TVSeries", "CreativeWork"}:
-                continue
-            _apply_json_ld(item, candidate)
-            return True
-    return False
-
-
-def _json_ld_type(data: dict[str, object]) -> str:
-    value = data.get("@type", "")
-    if isinstance(value, list):
-        return str(value[0]) if value else ""
-    return str(value)
-
-
-def _apply_json_ld(item: DoubanItem, data: dict[str, object]) -> None:
-    item.title = _json_text(data.get("name")) or item.title
-    item.summary = _json_text(data.get("description")) or item.summary
-    item.image_url = _json_text(data.get("image")) or item.image_url
-    item.director = _json_people(data.get("director")) or item.director
-    item.actors = _json_people(data.get("actor")) or item.actors
-    item.screenwriter = _json_people(data.get("author")) or item.screenwriter
-    item.genres = _json_join(data.get("genre")) or item.genres
-    item.release_date = _json_text(data.get("datePublished")) or item.release_date
-    item.runtime = _json_text(data.get("duration")) or item.runtime
-
-    rating = data.get("aggregateRating")
-    if isinstance(rating, dict):
-        item.rating = _json_text(rating.get("ratingValue")) or item.rating
-        item.comment_count = _json_text(rating.get("ratingCount")) or item.comment_count
-
-
-def _enrich_from_mobile_text(item: DoubanItem, soup: BeautifulSoup) -> bool:
-    title = _first_text(soup, "h1, .sub-title, title")
-    if title:
-        item.title = title.replace("(豆瓣)", "").strip()
-
-    summary = _first_text(soup, ".subject-intro, .intro, [data-clamp]")
-    if summary:
-        item.summary = _normalize_space(summary)
-
-    text = soup.get_text("\n", strip=True)
-    field_map = {
-        "导演": "director",
-        "编剧": "screenwriter",
-        "主演": "actors",
-        "类型": "genres",
-        "制片国家/地区": "country",
-        "语言": "language",
-        "上映日期": "release_date",
-        "片长": "runtime",
-        "IMDb": "imdb",
-    }
-    matched = False
-    for label, attr in field_map.items():
-        value = _text_label(text, label)
-        if value:
-            setattr(item, attr, value)
-            matched = True
-    return matched
-
-
-def _text_label(text: str, label: str) -> str:
-    labels = "|".join(re.escape(item) for item in INFO_LABELS)
-    match = re.search(rf"{re.escape(label)}\s*:?\s*(.+?)(?=\n(?:{labels})\s*:|\Z)", text, re.S)
-    if not match:
-        return ""
-    return _normalize_space(match.group(1))
-
-
-def _json_people(value: object) -> str:
-    if isinstance(value, dict):
-        return _json_text(value.get("name"))
-    if isinstance(value, list):
-        names = [_json_people(item) for item in value]
-        return " / ".join(name for name in names if name)
-    return _json_text(value)
-
-
-def _json_join(value: object) -> str:
-    if isinstance(value, list):
-        return " / ".join(_json_text(item) for item in value if _json_text(item))
-    return _json_text(value)
-
-
-def _json_text(value: object) -> str:
-    if value is None:
-        return ""
-    return _normalize_space(str(value))
-
-
-def _top250_comment_count(card: Tag) -> str:
-    text = _first_text(card, ".star span:last-child")
-    if text:
-        return _numbers_only(text)
-    star_text = _first_text(card, ".star")
-    return _numbers_only(star_text)
 
 
 def _title_and_link(card: Tag) -> tuple[str, str]:
@@ -413,10 +248,6 @@ def _info_label(soup: BeautifulSoup, label: str) -> str:
     if not info:
         return ""
 
-    label_node = info.find("span", class_="pl", string=re.compile(rf"^{re.escape(label)}\s*:"))
-    if label_node:
-        return _value_after_label(label_node)
-
     text = info.get_text(" ", strip=True)
     next_labels = "|".join(re.escape(item) for item in INFO_LABELS)
     pattern = rf"{re.escape(label)}\s*:?\s*(.+?)(?=(?:{next_labels})\s*:|$)"
@@ -424,23 +255,6 @@ def _info_label(soup: BeautifulSoup, label: str) -> str:
     if not match:
         return ""
     return _normalize_space(match.group(1))
-
-
-def _value_after_label(label_node: Tag) -> str:
-    values: list[str] = []
-    for sibling in label_node.next_siblings:
-        if isinstance(sibling, Tag) and "pl" in sibling.get("class", []):
-            break
-        if isinstance(sibling, Tag):
-            text = sibling.get_text(" ", strip=True)
-        elif isinstance(sibling, NavigableString):
-            text = str(sibling)
-        else:
-            text = ""
-        text = _normalize_space(text)
-        if text:
-            values.append(text)
-    return _normalize_space(" ".join(values).lstrip(":： "))
 
 
 def _normalize_space(text: str) -> str:
