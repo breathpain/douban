@@ -1,5 +1,5 @@
 """Small anti-spider helpers for respectful crawling."""
-
+"周"
 from __future__ import annotations
 
 import random
