@@ -35,5 +35,9 @@ class CrawlConfig:
     comment_limit: int = 3
     detail_workers: int = 1
     proxies: dict[str, str] | None = None
+    proxy_pool: tuple[dict[str, str], ...] = field(default_factory=tuple)
     cookie: str | None = None
     user_agents: tuple[str, ...] = field(default_factory=lambda: DEFAULT_USER_AGENTS)
+    page_param: str = "start"
+    page_size: int = 25
+    image_workers: int = 1
