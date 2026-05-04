@@ -9,7 +9,7 @@ from pathlib import Path
 
 from .cleaner import clean_items
 from .config import CrawlConfig
-from .crawler import DoubanCrawler, expand_paginated_urls, save_items
+from .crawler import DoubanCrawler, save_items
 from .parser import DoubanItem
 
 
