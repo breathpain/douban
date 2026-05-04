@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import random
 from dataclasses import dataclass
 from typing import Final
 
@@ -12,7 +13,7 @@ except ModuleNotFoundError as exc:  # pragma: no cover - environment guard
         "requests is required. Install dependencies with: pip install -r requirements.txt"
     ) from exc
 
-from .anti_spider import choose_user_agent, is_blocked, parse_cookie, polite_sleep
+from .anti_spider import choose_proxy, choose_user_agent, is_blocked, parse_cookie, polite_sleep
 from .config import CrawlConfig
 
 
@@ -39,19 +40,23 @@ class DoubanHttpClient:
             self.session.trust_env = False
         self.session.cookies.update(parse_cookie(config.cookie))
 
-    def get(self, url: str) -> HttpResult:
+    def get(self, url: str, referer: str | None = None) -> HttpResult:
         last_error: Exception | None = None
 
         for attempt in range(1, self.config.retry_times + 1):
-            headers = self._headers()
+            headers = self._headers(referer)
+            proxies = choose_proxy(self.config.proxies, self.config.proxy_pool)
             try:
+                polite_sleep(self.config.delay_min, self.config.delay_max)
                 response = self.session.get(
                     url,
                     headers=headers,
-                    proxies=self.config.proxies,
+                    proxies=proxies,
                     timeout=self.config.request_timeout,
                 )
-                if not response.encoding or response.encoding.lower() == "iso-8859-1":
+                if "douban.com" in response.url:
+                    response.encoding = "utf-8"
+                elif not response.encoding or response.encoding.lower() == "iso-8859-1":
                     response.encoding = response.apparent_encoding or "utf-8"
                 text = response.text
                 if "sec.douban.com" in response.url:
@@ -71,18 +76,37 @@ class DoubanHttpClient:
 
         raise RuntimeError(f"failed to fetch {url}: {last_error}") from last_error
 
-    def _headers(self) -> dict[str, str]:
-        return {
-            "User-Agent": choose_user_agent(self.config.user_agents),
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
-            "Accept-Encoding": "gzip, deflate",
+    def _headers(self, referer: str | None = None) -> dict[str, str]:
+        accept_languages = (
+            "zh-CN,zh;q=0.9,en;q=0.8",
+            "zh-CN,zh;q=0.9",
+            "zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7",
+        )
+        user_agent = choose_user_agent(self.config.user_agents)
+        headers = {
+            "User-Agent": user_agent,
+            "Accept": (
+                "text/html,application/xhtml+xml,application/xml;q=0.9,"
+                "image/avif,image/webp,*/*;q=0.8"
+            ),
+            "Accept-Language": random.choice(accept_languages),
+            "Accept-Encoding": "gzip, deflate, br",
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
+            "Pragma": "no-cache",
             "Upgrade-Insecure-Requests": "1",
             "Sec-Fetch-Dest": "document",
             "Sec-Fetch-Mode": "navigate",
-            "Sec-Fetch-Site": "same-origin",
+            "Sec-Fetch-Site": "same-origin" if referer else "none",
             "Sec-Fetch-User": "?1",
-            "Referer": DOUBAN_REFERER,
+            "Referer": referer or DOUBAN_REFERER,
         }
+        if "Chrome/" in user_agent:
+            headers.update(
+                {
+                    "sec-ch-ua": '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+                    "sec-ch-ua-mobile": "?0",
+                    "sec-ch-ua-platform": '"Windows"',
+                }
+            )
+        return headers

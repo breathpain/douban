@@ -20,8 +20,21 @@ BLOCK_KEYWORDS = (
 def choose_user_agent(user_agents: tuple[str, ...]) -> str:
     return random.choice(user_agents)
 
+def choose_proxy(
+    proxies: dict[str, str] | None,
+    proxy_pool: tuple[dict[str, str], ...] = (),
+) -> dict[str, str] | None:
+    if proxy_pool:
+        return random.choice(proxy_pool)
+    return proxies
 
 def polite_sleep(delay_min: float, delay_max: float) -> None:
+    if delay_max <= 0:
+        return
+    if delay_min < 0:
+        delay_min = 0
+    if delay_max < delay_min:
+        delay_min, delay_max = delay_max, delay_min
     time.sleep(random.uniform(delay_min, delay_max))
 
 

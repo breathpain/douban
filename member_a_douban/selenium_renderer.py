@@ -72,6 +72,42 @@ class SeleniumRenderer(AbstractContextManager["SeleniumRenderer"]):
             used_selenium=True,
         )
 
+    def render_comments(self, url: str, min_comments: int) -> HttpResult:
+        result = self.render(url)
+        if not self.driver or min_comments <= 0:
+            return result
+
+        attempts = max(1, min(8, (min_comments + 4) // 5))
+        for _ in range(attempts):
+            if len(self.driver.find_elements(By.CSS_SELECTOR, ".comment-item, .comment")) >= min_comments:
+                break
+            self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+            self._click_more_comments()
+            polite_sleep(self.config.delay_min, self.config.delay_max)
+
+        return HttpResult(
+            url=self.driver.current_url,
+            status_code=200,
+            text=self.driver.page_source,
+            used_selenium=True,
+        )
+
+    def _click_more_comments(self) -> None:
+        if not self.driver:
+            return
+        candidates = self.driver.find_elements(
+            By.XPATH,
+            "//a[contains(., '加载更多') or contains(., '更多') or contains(translate(., 'MORE', 'more'), 'more')]"
+            " | //button[contains(., '加载更多') or contains(., '更多') or contains(translate(., 'MORE', 'more'), 'more')]",
+        )
+        for element in candidates:
+            try:
+                if element.is_displayed() and element.is_enabled():
+                    self.driver.execute_script("arguments[0].click();", element)
+                    return
+            except Exception:
+                continue
+
     def _load_cookies(self) -> None:
         if self.cookies_loaded or not self.config.cookie:
             return

@@ -28,6 +28,11 @@ def download_image(
         return None
 
     output_dir.mkdir(parents=True, exist_ok=True)
+    url_suffix = Path(urlparse(url).path).suffix or ".jpg"
+    stem = _safe_filename_stem(filename_stem or Path(urlparse(url).path).stem or "image")
+    target = output_dir / f"{stem}{url_suffix}"
+    if target.exists() and target.stat().st_size > 0:
+        return target
     headers = {
         "User-Agent": choose_user_agent(config.user_agents),
         "Referer": "https://www.douban.com/",
@@ -42,9 +47,11 @@ def download_image(
     response.raise_for_status()
 
     content_type = response.headers.get("content-type", "").split(";")[0]
-    suffix = mimetypes.guess_extension(content_type) or Path(urlparse(url).path).suffix or ".jpg"
-    stem = _safe_filename_stem(filename_stem or Path(urlparse(url).path).stem or "image")
-    target = _unique_path(output_dir / f"{stem}{suffix}")
+    suffix = mimetypes.guess_extension(content_type) or url_suffix
+    if suffix != url_suffix:
+        target = output_dir / f"{stem}{suffix}"
+        if target.exists() and target.stat().st_size > 0:
+            return target
 
     with target.open("wb") as file:
         for chunk in response.iter_content(chunk_size=8192):
