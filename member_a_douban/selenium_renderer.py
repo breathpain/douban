@@ -1,5 +1,5 @@
 """Optional Selenium renderer for JavaScript-heavy or blocked pages."""
-"张"
+
 from __future__ import annotations
 
 from contextlib import AbstractContextManager

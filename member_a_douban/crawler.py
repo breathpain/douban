@@ -1,5 +1,5 @@
 """High-level Douban crawler workflow."""
-"w"
+
 from __future__ import annotations
 
 import csv

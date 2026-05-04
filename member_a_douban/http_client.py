@@ -1,5 +1,5 @@
 """Requests-based client with retry, delay, cookies, and rotating headers."""
-"w"
+
 from __future__ import annotations
 
 import random

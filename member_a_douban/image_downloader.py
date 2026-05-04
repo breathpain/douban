@@ -1,5 +1,5 @@
 """Image download utilities."""
-"zhou"
+
 from __future__ import annotations
 
 import mimetypes
