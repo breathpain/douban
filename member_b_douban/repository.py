@@ -39,13 +39,15 @@ def save_movies_with_comments(cfg: MySQLConfig, items: list[dict]) -> int:
 
 INSERT_MOVIE_SQL = """
     INSERT INTO movies (
-        title, url, rating, comment_count, summary,
+        rank, title, title_cn, title_en, url, rating,
+        comment_count, summary,
         image_url, source_page, image_file,
         director, screenwriter, actors, genres,
         country, language, release_date, runtime, imdb,
         detail_error
     ) VALUES (
-        %(title)s, %(url)s, %(rating)s, %(comment_count)s, %(summary)s,
+        %(rank)s, %(title)s, %(title_cn)s, %(title_en)s, %(url)s, %(rating)s,
+        %(comment_count)s, %(summary)s,
         %(image_url)s, %(source_page)s, %(image_file)s,
         %(director)s, %(screenwriter)s, %(actors)s, %(genres)s,
         %(country)s, %(language)s, %(release_date)s, %(runtime)s, %(imdb)s,
@@ -55,7 +57,7 @@ INSERT_MOVIE_SQL = """
 """
 
 INSERT_COMMENT_SQL = """
-    INSERT INTO comments (movie_id, `user`, rating, comment_time, helpful, comment)
+    INSERT IGNORE INTO comments (movie_id, `user`, rating, comment_time, helpful, comment)
     VALUES (%s, %s, %s, %s, %s, %s)
 """
 
@@ -65,7 +67,10 @@ def _upsert_movie(cur, item: dict) -> int | None:
 
     # Only keep fields that match the movies table columns
     fields = {
+        "rank": (item.get("rank") or "")[:10],
         "title": (item.get("title") or "")[:255],
+        "title_cn": (item.get("title_cn") or "")[:255],
+        "title_en": (item.get("title_en") or "")[:255],
         "url": (item.get("url") or "")[:512],
         "rating": (item.get("rating") or "")[:10],
         "comment_count": (item.get("comment_count") or "")[:20],

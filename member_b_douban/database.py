@@ -18,7 +18,10 @@ CREATE_DATABASE_SQL = (
 CREATE_MOVIES_TABLE_SQL = """
 CREATE TABLE IF NOT EXISTS movies (
     id              INT AUTO_INCREMENT PRIMARY KEY,
+    rank            VARCHAR(10)  NOT NULL DEFAULT '',
     title           VARCHAR(255) NOT NULL,
+    title_cn        VARCHAR(255) NOT NULL DEFAULT '',
+    title_en        VARCHAR(255) NOT NULL DEFAULT '',
     url             VARCHAR(512) NOT NULL DEFAULT '',
     rating          VARCHAR(10)  NOT NULL DEFAULT '',
     comment_count   VARCHAR(20)  NOT NULL DEFAULT '',
@@ -52,7 +55,8 @@ CREATE TABLE IF NOT EXISTS comments (
     comment      TEXT,
     created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (movie_id) REFERENCES movies(id) ON DELETE CASCADE,
-    INDEX idx_movie_id (movie_id)
+    INDEX idx_movie_id (movie_id),
+    UNIQUE KEY uk_movie_user_time (movie_id, `user`, comment_time, comment(255))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 """
 
