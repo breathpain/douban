@@ -183,15 +183,15 @@ def _run_import(output_dir: Path, save_mysql: bool) -> None:
     print(f"loaded {len(items)} items from {json_path if json_path.exists() else csv_path}")
 
     if save_mysql:
-        _save_to_mysql(items)
+        _save_to_mysql(items, recreate=True)
 
 
-def _save_to_mysql(items: list[DoubanItem]) -> int:
+def _save_to_mysql(items: list[DoubanItem], *, recreate: bool = False) -> int:
     """Save cleaned DoubanItem list into MySQL and export backups."""
     try:
         from member_b_douban import save_to_mysql
 
-        inserted = save_to_mysql([item.to_dict() for item in items])
+        inserted = save_to_mysql([item.to_dict() for item in items], recreate=recreate)
         print(f"saved {inserted} items into MySQL")
         print(f"backup exported to data/member_b/backup/")
         return inserted

@@ -14,6 +14,7 @@ __all__ = [
 def save_to_mysql(
     items: list[dict],
     *,
+    recreate: bool = False,
     host: str = "localhost",
     port: int = 3306,
     user: str = "root",
@@ -28,6 +29,8 @@ def save_to_mysql(
     ----------
     items : list[dict]
         Movie dicts as produced by ``DoubanItem.to_dict()``.
+    recreate : bool
+        If True, drop & recreate tables before inserting (used for full import).
     host, port, user, password, database :
         MySQL connection parameters.
     backup_dir :
@@ -45,6 +48,6 @@ def save_to_mysql(
         database=database,
         backup_dir=backup_dir,
     )
-    inserted = save_movies_with_comments(cfg, items)
+    inserted = save_movies_with_comments(cfg, items, recreate=recreate)
     export_backup(cfg)
     return inserted

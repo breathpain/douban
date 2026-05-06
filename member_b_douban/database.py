@@ -85,6 +85,18 @@ def init_database(cfg: MySQLConfig) -> None:
         conn.close()
 
 
+def drop_tables(cfg: MySQLConfig) -> None:
+    """Drop comments & movies tables (in child-first order for FK constraints)."""
+    conn = get_connection(cfg)
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DROP TABLE IF EXISTS comments")
+            cur.execute("DROP TABLE IF EXISTS movies")
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def create_tables(cfg: MySQLConfig) -> None:
     """Create movies & comments tables if they do not already exist."""
     conn = get_connection(cfg)

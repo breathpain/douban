@@ -5,23 +5,41 @@ from __future__ import annotations
 import re
 
 from .config import MySQLConfig
-from .database import create_tables, get_connection, init_database
+from .database import create_tables, drop_tables, get_connection, init_database
 
 
-def save_movies_with_comments(cfg: MySQLConfig, items: list[dict]) -> int:
+def save_movies_with_comments(
+    cfg: MySQLConfig, items: list[dict], *, recreate: bool = False
+) -> int:
     """
     Insert movie records (and their short comments) into MySQL.
+
+    Parameters
+    ----------
+    cfg : MySQLConfig
+        Database connection settings.
+    items : list[dict]
+        Movie dicts as produced by ``DoubanItem.to_dict()``.
+    recreate : bool
+        If True, drop & recreate tables before inserting (used for full import).
+        If False, check URL existence and skip duplicates (used for crawl).
 
     Returns the number of movies actually inserted (excludes duplicates).
     """
     init_database(cfg)
-    create_tables(cfg)
+    if recreate:
+        drop_tables(cfg)
+        create_tables(cfg)
+    else:
+        create_tables(cfg)
 
     conn = get_connection(cfg)
     inserted = 0
     try:
         with conn.cursor() as cur:
             for item in items:
+                if not recreate and _movie_exists(cur, item.get("url", "")):
+                    continue
                 movie_id = _upsert_movie(cur, item)
                 if movie_id:
                     inserted += 1
@@ -36,6 +54,13 @@ def save_movies_with_comments(cfg: MySQLConfig, items: list[dict]) -> int:
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
+
+
+def _movie_exists(cur, url: str) -> bool:
+    """Return True if a movie with the given URL already exists."""
+    cur.execute("SELECT 1 FROM movies WHERE url = %s", (url,))
+    return cur.fetchone() is not None
+
 
 INSERT_MOVIE_SQL = """
     INSERT INTO movies (
@@ -135,18 +160,24 @@ def _save_comments(cur, movie_id: int, raw_comments: str) -> None:
     if not raw_comments:
         return
 
+    seen: set[tuple[str, str, str]] = set()
     for line in raw_comments.split("\n"):
         line = line.strip()
-        if line:
-            parsed = _parse_comment_line(line)
-            cur.execute(
-                INSERT_COMMENT_SQL,
-                (
-                    movie_id,
-                    parsed["user"],
-                    parsed["rating"],
-                    parsed["comment_time"],
-                    parsed["helpful"],
-                    parsed["comment"],
-                ),
-            )
+        if not line:
+            continue
+        parsed = _parse_comment_line(line)
+        key = (parsed["user"], parsed["comment_time"], parsed["comment"])
+        if key in seen:
+            continue
+        seen.add(key)
+        cur.execute(
+            INSERT_COMMENT_SQL,
+            (
+                movie_id,
+                parsed["user"],
+                parsed["rating"],
+                parsed["comment_time"],
+                parsed["helpful"],
+                parsed["comment"],
+            ),
+        )
