@@ -33,7 +33,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--comment-limit",
         type=int,
-        default=15,
+        default=20,
         help="Short comments to crawl for each movie. Use 0 to skip comments.",
     )
     parser.add_argument(

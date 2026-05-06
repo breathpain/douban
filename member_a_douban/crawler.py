@@ -54,7 +54,8 @@ class DoubanCrawler:
             if renderer:
                 renderer.__exit__(None, None, None)
 
-        return all_items
+        # 全局去重：基于 URL 去重（同一电影可能在不同列表页出现）
+        return _deduplicate_items(all_items)
 
     def crawl_movie_top250(self) -> list[DoubanItem]:
         urls = [
@@ -224,7 +225,9 @@ class DoubanCrawler:
                     result = renderer.render_comments(comments_url, self.config.comment_limit)
                 else:
                     result = self._fetch(comments_url, renderer, client, referer=item.url)
-                comments = parse_movie_comments(result.text, self.config.comment_limit)
+                all_comments = parse_movie_comments(result.text, self.config.comment_limit)
+                # 去重：详情页已有的评论在 comments 页可能也包含，避免重复
+                comments = _deduplicate_comments(comments, all_comments)[: self.config.comment_limit]
             except Exception as exc:
                 if not item.detail_error:
                     item.detail_error = f"comments error: {exc}"
@@ -288,3 +291,45 @@ def _mobile_subject_url(url: str) -> str:
     if not match:
         return ""
     return f"https://m.douban.com/movie/subject/{match.group(1)}/"
+
+
+def _deduplicate_comments(
+    existing: list[str], incoming: list[str]
+) -> list[str]:
+    """
+    对两份评论列表进行去重合并。
+    existing 来自详情页（detail_html），incoming 来自 comments 完整页。
+    以 "评论：" 之后的文本内容为唯一标识，保留首次出现的顺序。
+    """
+    seen: set[str] = set()
+    result: list[str] = []
+
+    for comment in existing + incoming:
+        key = _comment_key(comment)
+        if key and key not in seen:
+            seen.add(key)
+            result.append(comment)
+
+    return result
+
+
+def _comment_key(comment: str) -> str:
+    """从格式化的评论字符串中提取去重 key（评论文本）。"""
+    match = re.search(r"评论：(.*)", comment)
+    if match:
+        text = match.group(1).strip()
+        # 去除末尾标点差异
+        return text.rstrip("。.!！")
+    return comment.strip()
+
+
+def _deduplicate_items(items: list[DoubanItem]) -> list[DoubanItem]:
+    """基于 URL 对 DoubanItem 列表去重，保留首次出现的记录。"""
+    seen: set[str] = set()
+    result: list[DoubanItem] = []
+    for item in items:
+        key = item.url.rstrip("/")
+        if key and key not in seen:
+            seen.add(key)
+            result.append(item)
+    return result
