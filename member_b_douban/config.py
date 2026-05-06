@@ -12,7 +12,7 @@ class MySQLConfig:
     host: str = "localhost"
     port: int = 3306
     user: str = "root"
-    password: str = ""
+    password: str = "123456"
     database: str = "douban"
     charset: str = "utf8mb4"
 

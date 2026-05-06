@@ -39,7 +39,7 @@ def save_movies_with_comments(cfg: MySQLConfig, items: list[dict]) -> int:
 
 INSERT_MOVIE_SQL = """
     INSERT INTO movies (
-        rank, title, title_cn, title_en, url, rating,
+        `rank`, title, title_cn, title_en, url, rating,
         comment_count, summary,
         image_url, source_page, image_file,
         director, screenwriter, actors, genres,
@@ -57,7 +57,7 @@ INSERT_MOVIE_SQL = """
 """
 
 INSERT_COMMENT_SQL = """
-    INSERT IGNORE INTO comments (movie_id, `user`, rating, comment_time, helpful, comment)
+    INSERT IGNORE INTO comments (movie_id, `user`, rating, comment_time, helpful, `comment`)
     VALUES (%s, %s, %s, %s, %s, %s)
 """
 
