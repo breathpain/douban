@@ -23,6 +23,7 @@ from .parser import (
     DoubanItem,
     enrich_movie_detail,
     has_movie_detail_info,
+    has_next_page,
     parse_douban_items,
     parse_movie_comments,
 )
@@ -39,7 +40,8 @@ class DoubanCrawler:
         renderer: SeleniumRenderer | None = None
 
         try:
-            if self.config.use_selenium:
+            # 当配置了 chromedriver 路径时也自动启用 Selenium（应对详情页 sec.douban.com 安全验证）
+            if self.config.use_selenium or self.config.chrome_driver_path:
                 renderer = SeleniumRenderer(self.config).__enter__()
 
             for url in tqdm(urls, desc="list pages", unit="page"):
@@ -120,13 +122,18 @@ class DoubanCrawler:
             item.image_file = str(path)
 
     def _crawl_details(self, items: list[DoubanItem], renderer: SeleniumRenderer | None) -> None:
-        if renderer is None and self.config.detail_workers > 1:
-            self._crawl_details_concurrently(items)
-            return
-
-        for item in tqdm(items, desc="details/comments", unit="movie", leave=False):
-            self._crawl_detail_item(item, renderer)
-            polite_sleep(self.config.delay_min, self.config.delay_max)
+        # Selenium 模式下不启用并发（共享浏览器实例），但可同时执行约 3-5 个详情页
+        if renderer is None:
+            if self.config.detail_workers > 1:
+                self._crawl_details_concurrently(items)
+                return
+            for item in tqdm(items, desc="details/comments", unit="movie", leave=False):
+                self._crawl_detail_item(item, renderer)
+                polite_sleep(self.config.delay_min, self.config.delay_max)
+        else:
+            for item in tqdm(items, desc="details/comments", unit="movie", leave=False):
+                self._crawl_detail_item(item, renderer)
+                polite_sleep(self.config.delay_min, self.config.delay_max)
 
     def _crawl_details_concurrently(self, items: list[DoubanItem]) -> None:
         with ThreadPoolExecutor(max_workers=self.config.detail_workers) as executor:
@@ -215,24 +222,64 @@ class DoubanCrawler:
         if self.config.comment_limit <= 0:
             return
 
-        comments = parse_movie_comments(detail_html, self.config.comment_limit)
-        if len(comments) < self.config.comment_limit:
-            comments_url = item.url.rstrip("/") + "/comments?" + urlencode(
-                {"limit": self.config.comment_limit, "status": "P", "sort": "new_score"}
-            )
+        base_url = item.url.rstrip("/")
+        all_comments: list[str] = []
+        page = 0
+        movie_label = item.title[:20] if item.title else ""
+
+        pbar = tqdm(
+            total=self.config.comment_limit,
+            desc=f"comments: {movie_label}" if movie_label else "comments",
+            unit="cmt",
+            leave=False,
+        )
+
+        while len(all_comments) < self.config.comment_limit:
+            if page == 0:
+                # 第一页
+                comments_url = base_url + "/comments?" + urlencode({"status": "P"})
+            else:
+                # 后续翻页
+                comments_url = base_url + "/comments?" + urlencode(
+                    {
+                        "start": page * 20,
+                        "limit": 20,
+                        "status": "P",
+                        "sort": "new_score",
+                    }
+                )
+
             try:
                 if renderer is not None:
                     result = renderer.render_comments(comments_url, self.config.comment_limit)
                 else:
                     result = self._fetch(comments_url, renderer, client, referer=item.url)
-                all_comments = parse_movie_comments(result.text, self.config.comment_limit)
-                # 去重：详情页已有的评论在 comments 页可能也包含，避免重复
-                comments = _deduplicate_comments(comments, all_comments)[: self.config.comment_limit]
             except Exception as exc:
                 if not item.detail_error:
-                    item.detail_error = f"comments error: {exc}"
+                    item.detail_error = f"comments error at page {page}: {exc}"
+                break
 
-        item.short_comments = "\n".join(comments[: self.config.comment_limit])
+            page_comments = parse_movie_comments(result.text, 999)
+            if not page_comments:
+                break
+
+            # 与已收集评论去重
+            all_comments = _deduplicate_comments(all_comments, page_comments)
+            pbar.update(min(len(all_comments), self.config.comment_limit) - pbar.n)
+
+            # 如果该页不满 20 条，说明已是最后一页
+            if len(page_comments) < 20:
+                break
+
+            # 检查分页器是否有"后页"链接
+            if not has_next_page(result.text):
+                break
+
+            page += 1
+            polite_sleep(self.config.delay_min, self.config.delay_max)
+
+        pbar.close()
+        item.short_comments = "\n".join(all_comments[: self.config.comment_limit])
 
 
 def save_items(items: list[DoubanItem], output_dir: Path) -> tuple[Path, Path]:

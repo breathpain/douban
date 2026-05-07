@@ -134,7 +134,7 @@ def parse_movie_comments(html: str, limit: int) -> list[str]:
 
     soup = BeautifulSoup(html, "lxml")
     comments: list[str] = []
-    for node in soup.select(".comment-item, .comment"):
+    for node in soup.select(".comment-item"):
         text = _first_text(node, ".short, .comment-content")
         if not text:
             continue
@@ -157,6 +157,15 @@ def parse_movie_comments(html: str, limit: int) -> list[str]:
         if len(comments) >= limit:
             break
     return comments
+
+
+def has_next_page(html: str) -> bool:
+    """Check if the comments page has a 'next page' link in the paginator."""
+    soup = BeautifulSoup(html, "lxml")
+    paginator = soup.select_one("#paginator")
+    if paginator:
+        return paginator.select_one("a.next") is not None
+    return False
 
 
 def _parse_movie_top250(soup: BeautifulSoup, source_url: str) -> Iterable[DoubanItem]:

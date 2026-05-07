@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import random
+import re
 from dataclasses import dataclass
 from typing import Final
 
@@ -13,7 +14,14 @@ except ModuleNotFoundError as exc:  # pragma: no cover - environment guard
         "requests is required. Install dependencies with: pip install -r requirements.txt"
     ) from exc
 
-from .anti_spider import choose_proxy, choose_user_agent, is_blocked, parse_cookie, polite_sleep
+from .anti_spider import (
+    BLOCK_TITLE_PATTERNS,
+    choose_proxy,
+    choose_user_agent,
+    is_blocked,
+    parse_cookie,
+    polite_sleep,
+)
 from .config import CrawlConfig
 
 
@@ -22,6 +30,15 @@ DOUBAN_REFERER: Final = "https://www.douban.com/"
 
 class BlockedByDoubanError(RuntimeError):
     """Raised when Douban returns an obvious anti-spider page."""
+
+
+_TITLE_RE = re.compile(r"<title[^>]*>(.*?)</title>", re.IGNORECASE | re.DOTALL)
+
+
+def _extract_title(html: str) -> str:
+    """Extract the <title> text from HTML."""
+    match = _TITLE_RE.search(html)
+    return match.group(1).strip() if match else ""
 
 
 @dataclass
@@ -67,6 +84,23 @@ class DoubanHttpClient:
                     raise BlockedByDoubanError(
                         f"blocked by Douban, status={response.status_code}, url={url}"
                     )
+                # Check page title for anti-spider / error pages
+                title = _extract_title(text)
+                if title and any(p in title for p in BLOCK_TITLE_PATTERNS):
+                    raise BlockedByDoubanError(
+                        f"blocked by Douban, suspicious title={title!r}, url={url}"
+                    )
+                # Detect redirects to login / security pages
+                original_path = url.split("?")[0].rstrip("/")
+                final_path = response.url.split("?")[0].rstrip("/")
+                if (
+                    "douban.com" in response.url
+                    and original_path != final_path
+                    and "accounts.douban.com" in response.url
+                ):
+                    raise BlockedByDoubanError(
+                        f"redirected to login page, from={original_path} to={final_path}"
+                    )
                 response.raise_for_status()
                 return HttpResult(url=response.url, status_code=response.status_code, text=text)
             except (requests.RequestException, BlockedByDoubanError) as exc:
@@ -90,7 +124,7 @@ class DoubanHttpClient:
                 "image/avif,image/webp,*/*;q=0.8"
             ),
             "Accept-Language": random.choice(accept_languages),
-            "Accept-Encoding": "gzip, deflate, br",
+            "Accept-Encoding": "gzip, deflate",
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
             "Pragma": "no-cache",
