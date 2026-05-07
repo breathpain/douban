@@ -92,13 +92,13 @@ def _upsert_movie(cur, item: dict) -> int | None:
 
     # Only keep fields that match the movies table columns
     fields = {
-        "rank": (item.get("rank") or "")[:10],
+        "rank": item.get("rank"),
         "title": (item.get("title") or "")[:255],
         "title_cn": (item.get("title_cn") or "")[:255],
         "title_en": (item.get("title_en") or "")[:255],
         "url": (item.get("url") or "")[:512],
-        "rating": (item.get("rating") or "")[:10],
-        "comment_count": (item.get("comment_count") or "")[:20],
+        "rating": item.get("rating"),
+        "comment_count": item.get("comment_count"),
         "summary": item.get("summary") or "",
         "image_url": (item.get("image_url") or "")[:512],
         "source_page": (item.get("source_page") or "")[:512],
@@ -170,6 +170,11 @@ def _save_comments(cur, movie_id: int, raw_comments: str) -> None:
         if key in seen:
             continue
         seen.add(key)
+
+        # Convert helpful to int (or None if empty)
+        helpful_raw = parsed["helpful"].strip()
+        helpful_val: int | None = int(helpful_raw) if helpful_raw else None
+
         cur.execute(
             INSERT_COMMENT_SQL,
             (
@@ -177,7 +182,7 @@ def _save_comments(cur, movie_id: int, raw_comments: str) -> None:
                 parsed["user"],
                 parsed["rating"],
                 parsed["comment_time"],
-                parsed["helpful"],
+                helpful_val,
                 parsed["comment"],
             ),
         )

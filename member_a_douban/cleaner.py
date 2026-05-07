@@ -15,12 +15,14 @@ def clean_items(items: list[DoubanItem]) -> list[DoubanItem]:
     """Apply standard cleaning transforms to a list of DoubanItem (in-place).
 
     Cleans the following fields:
-      - **rating**: keeps only valid float string (e.g. ``"9.7"``)
-      - **comment_count**: keeps only digits (e.g. ``"3282402"``)
+      - **rank**: converts to ``int`` (e.g. ``1``)
+      - **rating**: converts to ``float`` (e.g. ``9.7``)
+      - **comment_count**: converts to ``int`` (e.g. ``3282402``)
       - **imdb**: extracts ``ttXXXXXX`` ID, discarding extra text
-      - **runtime**: converts to ``int`` (minutes), discarding unit/notes
+      - **runtime**: keeps as ``int`` (minutes)
     """
     for item in items:
+        _clean_rank(item)
         _clean_rating(item)
         _clean_comment_count(item)
         _clean_imdb(item)
@@ -32,21 +34,48 @@ def clean_items(items: list[DoubanItem]) -> list[DoubanItem]:
 # Internal cleaners
 # ---------------------------------------------------------------------------
 
+def _clean_rank(item: DoubanItem) -> None:
+    rank = item.rank
+    if rank is None:
+        return
+    if isinstance(rank, int):
+        return  # already clean
+    rank = rank.strip()
+    if not rank:
+        item.rank = None
+        return
+    match = re.search(r"\d+", rank)
+    item.rank = int(match.group(0)) if match else None
+
+
 def _clean_rating(item: DoubanItem) -> None:
-    rating = item.rating.strip()
+    rating = item.rating
+    if rating is None:
+        return
+    if isinstance(rating, (int, float)):
+        item.rating = float(rating)
+        return
+    rating = rating.strip()
     if not rating:
+        item.rating = None
         return
     match = re.search(r"\d+(?:\.\d+)?", rating)
-    item.rating = match.group(0) if match else ""
+    item.rating = float(match.group(0)) if match else None
 
 
 def _clean_comment_count(item: DoubanItem) -> None:
-    count = item.comment_count.strip()
+    count = item.comment_count
+    if count is None:
+        return
+    if isinstance(count, int):
+        return  # already clean
+    count = count.strip()
     if not count:
+        item.comment_count = None
         return
     # Remove commas first, then extract digits
     match = re.search(r"\d+", count.replace(",", ""))
-    item.comment_count = match.group(0) if match else ""
+    item.comment_count = int(match.group(0)) if match else None
 
 
 def _clean_imdb(item: DoubanItem) -> None:

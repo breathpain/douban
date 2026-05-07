@@ -18,13 +18,13 @@ CREATE_DATABASE_SQL = (
 CREATE_MOVIES_TABLE_SQL = """
 CREATE TABLE IF NOT EXISTS movies (
     id              INT AUTO_INCREMENT PRIMARY KEY,
-    `rank`          VARCHAR(10)  NOT NULL DEFAULT '',
+    `rank`          INT             DEFAULT NULL,
     title           VARCHAR(255) NOT NULL,
     title_cn        VARCHAR(255) NOT NULL DEFAULT '',
     title_en        VARCHAR(255) NOT NULL DEFAULT '',
     url             VARCHAR(512) NOT NULL DEFAULT '',
-    rating          VARCHAR(10)  NOT NULL DEFAULT '',
-    comment_count   VARCHAR(20)  NOT NULL DEFAULT '',
+    rating          DECIMAL(3,1)    DEFAULT NULL,
+    comment_count   INT             DEFAULT NULL,
     summary         TEXT,
     image_url       VARCHAR(512) NOT NULL DEFAULT '',
     source_page     VARCHAR(512) NOT NULL DEFAULT '',
@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS comments (
     `user`       VARCHAR(255)  NOT NULL DEFAULT '',
     rating       VARCHAR(50)   NOT NULL DEFAULT '',
     comment_time VARCHAR(100)  NOT NULL DEFAULT '',
-    helpful      VARCHAR(20)   NOT NULL DEFAULT '',
+    helpful      INT             DEFAULT NULL,
     `comment`      TEXT,
     created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (movie_id) REFERENCES movies(id) ON DELETE CASCADE,
@@ -97,6 +97,37 @@ def drop_tables(cfg: MySQLConfig) -> None:
         conn.close()
 
 
+MIGRATE_MOVIES_SQL = [
+    "ALTER TABLE movies MODIFY COLUMN `rank` INT DEFAULT NULL",
+    "ALTER TABLE movies MODIFY COLUMN `rating` DECIMAL(3,1) DEFAULT NULL",
+    "ALTER TABLE movies MODIFY COLUMN `comment_count` INT DEFAULT NULL",
+]
+"""ALTER TABLE statements to migrate existing databases to numeric columns."""
+
+MIGRATE_COMMENTS_SQL = [
+    "ALTER TABLE comments MODIFY COLUMN `helpful` INT DEFAULT NULL",
+]
+
+
+def migrate_schema(cfg: MySQLConfig) -> None:
+    """Migrate existing tables columns from VARCHAR to numeric types.
+
+    This is safe to call on already-migrated tables; each ALTER TABLE
+    is a no-op when the column already has the target type.
+    """
+    conn = get_connection(cfg)
+    try:
+        with conn.cursor() as cur:
+            for sql in MIGRATE_MOVIES_SQL + MIGRATE_COMMENTS_SQL:
+                try:
+                    cur.execute(sql)
+                except Exception:
+                    pass  # column may already be the target type
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def create_tables(cfg: MySQLConfig) -> None:
     """Create movies & comments tables if they do not already exist."""
     conn = get_connection(cfg)
@@ -107,3 +138,4 @@ def create_tables(cfg: MySQLConfig) -> None:
         conn.commit()
     finally:
         conn.close()
+    migrate_schema(cfg)

@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import asdict, dataclass
-from typing import Iterable
+from typing import Any, Iterable
 from urllib.parse import urljoin
 
 try:
@@ -34,13 +34,13 @@ INFO_LABELS = (
 
 @dataclass
 class DoubanItem:
-    rank: str
     title: str
     url: str
+    rank: int | None = None
     title_cn: str = ""
     title_en: str = ""
-    rating: str = ""
-    comment_count: str = ""
+    rating: float | None = None
+    comment_count: int | None = None
     summary: str = ""
     image_url: str = ""
     source_page: str = ""
@@ -52,12 +52,12 @@ class DoubanItem:
     country: str = ""
     language: str = ""
     release_date: str = ""
-    runtime: str | None = None
+    runtime: int | None = None
     imdb: str = ""
     short_comments: str = ""
     detail_error: str = ""
 
-    def to_dict(self) -> dict[str, str | None]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 

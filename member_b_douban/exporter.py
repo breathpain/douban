@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import json
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -46,7 +47,7 @@ def _fetch_movies_with_comments(cfg: MySQLConfig) -> list[dict[str, Any]]:
     try:
         with conn.cursor() as cur:
             cur.execute("SELECT * FROM movies ORDER BY id")
-            movies = list(cur.fetchall())
+            movies = [_convert_decimal_row(row) for row in cur.fetchall()]
 
             cur.execute(
                 "SELECT movie_id, `user`, rating, comment_time, helpful, comment "
@@ -71,6 +72,14 @@ def _fetch_movies_with_comments(cfg: MySQLConfig) -> list[dict[str, Any]]:
         return movies
     finally:
         conn.close()
+
+
+def _convert_decimal_row(row: dict[str, Any]) -> dict[str, Any]:
+    """Convert Decimal values to float so the row is JSON-serializable."""
+    return {
+        k: float(v) if isinstance(v, Decimal) else v
+        for k, v in row.items()
+    }
 
 
 def _write_movies_csv(movies: list[dict[str, Any]], path: Path) -> None:
