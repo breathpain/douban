@@ -7,6 +7,7 @@ before saving to file or database.
 from __future__ import annotations
 
 import re
+from dataclasses import fields
 
 from .parser import DoubanItem
 
@@ -22,6 +23,7 @@ def clean_items(items: list[DoubanItem]) -> list[DoubanItem]:
       - **runtime**: keeps as ``int`` (minutes)
     """
     for item in items:
+        _clean_text_nbsp(item)
         _clean_rank(item)
         _clean_rating(item)
         _clean_comment_count(item)
@@ -33,6 +35,14 @@ def clean_items(items: list[DoubanItem]) -> list[DoubanItem]:
 # ---------------------------------------------------------------------------
 # Internal cleaners
 # ---------------------------------------------------------------------------
+
+def _clean_text_nbsp(item: DoubanItem) -> None:
+    """Replace non-breaking spaces (\u00a0) in all string fields with normal space."""
+    for f in fields(DoubanItem):
+        val = getattr(item, f.name)
+        if isinstance(val, str) and "\u00a0" in val:
+            setattr(item, f.name, val.replace("\u00a0", " ").strip())
+
 
 def _clean_rank(item: DoubanItem) -> None:
     rank = item.rank

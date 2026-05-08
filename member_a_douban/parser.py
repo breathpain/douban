@@ -173,7 +173,9 @@ def _parse_movie_top250(soup: BeautifulSoup, source_url: str) -> Iterable[Douban
         title_nodes = [node.get_text(strip=True) for node in card.select(".hd .title")]
         title = " ".join(dict.fromkeys(title_nodes)).strip()
         title_cn = title_nodes[0] if title_nodes else title
-        title_en = " ".join(node.strip(" /") for node in title_nodes[1:] if node.strip(" /"))
+        title_en = " ".join(
+            node.strip(" /\u00a0") for node in title_nodes[1:] if node.strip(" /\u00a0")
+        )
         link = _first_attr(card, ".hd a", "href")
         rank = _first_text(card, ".pic em")
         rating = _first_text(card, ".rating_num")
@@ -453,4 +455,6 @@ def _value_after_label(label_node: Tag) -> str:
 
 
 def _normalize_space(text: str) -> str:
+    # Replace non-breaking spaces before collapsing other whitespace
+    text = text.replace("\u00a0", " ")
     return re.sub(r"\s+", " ", text).strip()
