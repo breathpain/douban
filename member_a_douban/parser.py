@@ -458,3 +458,55 @@ def _normalize_space(text: str) -> str:
     # Replace non-breaking spaces before collapsing other whitespace
     text = text.replace("\u00a0", " ")
     return re.sub(r"\s+", " ", text).strip()
+
+
+# ---------------------------------------------------------------------------
+# Rexxar API comment parser (used by Scrapy spider)
+# ---------------------------------------------------------------------------
+
+def parse_rexxar_comments(text: str, limit: int) -> list[str]:
+    """Parse short comments from a Rexxar API JSON response (mobile API).
+
+    Args:
+        text: JSON body of the Rexxar ``/interests`` endpoint.
+        limit: Maximum number of comments to return.
+
+    Returns:
+        A list of comment strings in the same format as ``parse_movie_comments``.
+    """
+    if limit <= 0:
+        return []
+
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        return []
+
+    interests = data.get("interests") or []
+    comments: list[str] = []
+    for interest in interests:
+        if not isinstance(interest, dict):
+            continue
+        rating = interest.get("rating") or {}
+        user = interest.get("user") or {}
+        username = _json_text(user.get("name"))
+        rating_value = rating.get("value") if isinstance(rating, dict) else None
+        create_time = interest.get("create_time", "")
+        vote_count = interest.get("vote_count", 0)
+        comment_text = interest.get("comment", "")
+
+        parts = []
+        if username:
+            parts.append(f"用户：{username}")
+        if rating_value is not None:
+            parts.append(f"评分：{rating_value}星")
+        if create_time:
+            parts.append(f"时间：{create_time}")
+        if vote_count:
+            parts.append(f"有用：{vote_count}")
+        if comment_text:
+            parts.append(f"评论：{_normalize_space(comment_text)}")
+        comments.append(" | ".join(parts))
+        if len(comments) >= limit:
+            break
+    return comments
