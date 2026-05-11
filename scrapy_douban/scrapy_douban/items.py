@@ -1,6 +1,6 @@
 """Scrapy Item definitions for Douban crawler.
 
-Each field maps 1:1 to the original DoubanItem dataclass in member_a_douban.parser,
+Each field maps 1:1 to the original DoubanItem dataclass in requests_douban.parser,
 allowing seamless conversion between the two representations.
 """
 

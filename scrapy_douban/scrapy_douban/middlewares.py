@@ -18,16 +18,16 @@ from scrapy.downloadermiddlewares.retry import RetryMiddleware
 from scrapy.exceptions import IgnoreRequest, NotConfigured
 
 try:
-    from member_a_douban.anti_spider import (
+    from requests_douban.anti_spider import (
         BLOCK_TITLE_PATTERNS,
         choose_user_agent,
         is_blocked,
         parse_cookie,
     )
-    from member_a_douban.config import CrawlConfig, DEFAULT_USER_AGENTS
-    from member_a_douban.http_client import _extract_title
+    from requests_douban.config import CrawlConfig, DEFAULT_USER_AGENTS
+    from requests_douban.http_client import _extract_title
 except ImportError:
-    # Fallback definitions when member_a_douban is not importable
+    # Fallback definitions when requests_douban is not importable
     CrawlConfig = None  # type: ignore[assignment]
     DEFAULT_USER_AGENTS = (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -96,7 +96,7 @@ class ProxyMiddleware:
 
     @classmethod
     def from_crawler(cls, crawler) -> ProxyMiddleware:
-        from member_a_douban.config import CrawlConfig
+        from requests_douban.config import CrawlConfig
         # Try reading from CrawlConfig (when run via app.py)
         if CrawlConfig is not None:
             try:

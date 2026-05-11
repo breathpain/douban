@@ -1,6 +1,6 @@
 """Scrapy settings for scrapy_douban project.
 
-Mirrors the CrawlConfig defaults from member_a_douban.config while adding
+Mirrors the CrawlConfig defaults from requests_douban.config while adding
 Scrapy-specific tuning for polite / anti-spider behaviour.
 """
 
@@ -9,7 +9,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-# Ensure the project root (F:\douban) is on sys.path so ``member_a_douban`` is importable
+# Ensure the project root (F:\douban) is on sys.path so ``requests_douban`` is importable
 # when ``scrapy crawl`` is run from the ``scrapy_douban/`` directory.
 _project_root = Path(__file__).resolve().parent.parent.parent
 if str(_project_root) not in sys.path:

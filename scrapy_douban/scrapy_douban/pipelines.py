@@ -17,9 +17,9 @@ from typing import Any
 from scrapy import Spider, signals
 
 try:
-    from member_a_douban.cleaner import clean_items as _clean_parser_items
-    from member_a_douban.image_downloader import download_image
-    from member_a_douban.parser import DoubanItem as ParserItem
+    from requests_douban.cleaner import clean_items as _clean_parser_items
+    from requests_douban.image_downloader import download_image
+    from requests_douban.parser import DoubanItem as ParserItem
 except ImportError:
     ParserItem = None  # type: ignore[assignment]
 
@@ -105,7 +105,7 @@ class ImageDownloadPipeline:
         image_url = item["image_url"]
         filename_stem = item.get("title") or None
 
-        from member_a_douban.config import CrawlConfig as _Cfg
+        from requests_douban.config import CrawlConfig as _Cfg
         # Build a minimal config for image_downloader
         cfg = _Cfg(
             image_dir=self.image_dir or Path("data/member_a/images"),

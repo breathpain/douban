@@ -522,9 +522,9 @@ class GuiApp:
 
     def _run_crawl_task(self, cfg: dict[str, Any]) -> None:
         """Run the crawl workflow (top250 or urls)."""
-        from member_a_douban.config import CrawlConfig
-        from member_a_douban.crawler import DoubanCrawler, expand_paginated_urls, save_items
-        from member_a_douban.cleaner import clean_items
+        from requests_douban.config import CrawlConfig
+        from requests_douban.crawler import DoubanCrawler, expand_paginated_urls, save_items
+        from requests_douban.cleaner import clean_items
 
         output_dir = Path(cfg["output_dir"])
         image_dir = output_dir / "images"
@@ -607,8 +607,8 @@ class GuiApp:
 
     def _run_import_task(self, cfg: dict[str, Any]) -> None:
         """Run the import workflow."""
-        from member_a_douban.cleaner import clean_items
-        from member_a_douban.parser import DoubanItem
+        from requests_douban.cleaner import clean_items
+        from requests_douban.parser import DoubanItem
 
         import csv
         import json
@@ -647,7 +647,7 @@ class GuiApp:
 
     def _save_to_mysql(self, items: list, cfg: dict[str, Any]) -> None:
         """Save items to MySQL."""
-        from member_b_douban import save_to_mysql
+        from database_service import save_to_mysql
 
         mode = cfg["mode"]
         backup_dir = str(self._resolve_path(cfg["mysql_backup_dir"]))

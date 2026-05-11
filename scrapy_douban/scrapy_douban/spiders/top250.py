@@ -3,8 +3,8 @@
 Workflow
 --------
 1. Request Top250 list pages (via Scrapy)
-2. Parse list items (via ``member_a_douban.parser``)
-3. Enrich movie data & comments via ``member_a_douban.crawler.DoubanCrawler``
+2. Parse list items (via ``requests_douban.parser``)
+3. Enrich movie data & comments via ``requests_douban.crawler.DoubanCrawler``
    (which handles Desktop→Mobile→Selenium fallback internally)
 """
 
@@ -19,16 +19,16 @@ from urllib.parse import urlencode
 import scrapy
 from scrapy.http import Response
 
-from member_a_douban.config import CrawlConfig
-from member_a_douban.crawler import DoubanCrawler
-from member_a_douban.http_client import DoubanHttpClient
-from member_a_douban.parser import (
+from requests_douban.config import CrawlConfig
+from requests_douban.crawler import DoubanCrawler
+from requests_douban.http_client import DoubanHttpClient
+from requests_douban.parser import (
     DoubanItem as ParserItem,
     enrich_movie_detail,
     has_movie_detail_info,
     parse_douban_items,
 )
-from member_a_douban.selenium_renderer import SeleniumRenderer
+from requests_douban.selenium_renderer import SeleniumRenderer
 
 from ..items import DoubanItem as ScrapyItem
 
@@ -43,7 +43,7 @@ class Top250Spider(scrapy.Spider):
     """Crawl Douban Movie Top250 list, detail pages and short comments.
 
     List pages are fetched via Scrapy (fast).
-    Detail + comment enrichment delegates to ``member_a_douban``'s
+    Detail + comment enrichment delegates to ``requests_douban``'s
     ``DoubanCrawler._crawl_detail_item`` logic, which falls back to
     Selenium when the HTTP client is blocked.
     """
@@ -72,7 +72,7 @@ class Top250Spider(scrapy.Spider):
         kwargs.setdefault("crawl_details", str(crawler.settings.getbool("CRAWL_DETAILS", True)))
         spider = super().from_crawler(crawler, *args, **kwargs)
 
-        # Build CrawlConfig from Scrapy settings for member_a_douban fallback
+        # Build CrawlConfig from Scrapy settings for requests_douban fallback
         cfg = CrawlConfig(
             request_timeout=crawler.settings.getint("DOWNLOAD_TIMEOUT", 15),
             retry_times=crawler.settings.getint("RETRY_TIMES", 3),
@@ -111,7 +111,7 @@ class Top250Spider(scrapy.Spider):
             )
 
     # ----------------------------------------------------------------
-    # 2. Parse list page → enrich details via member_a_douban pipeline
+    # 2. Parse list page → enrich details via requests_douban pipeline
     # ----------------------------------------------------------------
 
     def parse_list(self, response: Response):
@@ -149,7 +149,7 @@ class Top250Spider(scrapy.Spider):
     ) -> None:
         """Enrich a single ParserItem with detail + comments.
 
-        Mirrors ``member_a_douban.crawler.DoubanCrawler._crawl_detail_item``.
+        Mirrors ``requests_douban.crawler.DoubanCrawler._crawl_detail_item``.
         """
         if not item.url:
             return
@@ -162,7 +162,7 @@ class Top250Spider(scrapy.Spider):
 
         enrich_movie_detail(item, html)
 
-        # ---- Comments (via DoubanCrawler, same logic as member_a_douban) ----
+        # ---- Comments (via DoubanCrawler, same logic as requests_douban) ----
         if self.comment_limit > 0:
             self._douban_crawler._crawl_comments(item, html, renderer)
 

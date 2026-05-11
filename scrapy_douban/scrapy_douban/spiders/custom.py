@@ -13,7 +13,7 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 import scrapy
 from scrapy.http import Response
 
-from member_a_douban.parser import (
+from requests_douban.parser import (
     DoubanItem as ParserItem,
     enrich_movie_detail,
     has_movie_detail_info,
