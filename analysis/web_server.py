@@ -39,7 +39,7 @@ import pandas as pd
 
 # ── Flask ──────────────────────────────────────────────────────────────
 try:
-    from flask import Flask, Response, jsonify, request
+    from flask import Flask, Response, jsonify, request, send_from_directory
 except ImportError:
     print("请安装 Flask: pip install flask")
     sys.exit(1)
@@ -61,6 +61,10 @@ if str(PROJECT_ROOT) not in sys.path:
 
 OUTPUT_DIR = BASE_DIR / "output"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+# 图片目录
+POSTER_IMAGES_DIR = PROJECT_ROOT / "data" / "crawler" / "images"
+ANALYSIS_IMAGES_DIR = BASE_DIR / "output"
 
 # 内嵌依赖路径
 JQUERY_PATH = OUTPUT_DIR / "jquery.min.js"
@@ -701,7 +705,7 @@ def api_crawl_start():
         "show_browser": data.get("show_browser", False),
         "driver_path": data.get("driver_path") or None,
         "proxies": data.get("proxies", []),
-        "output_dir": data.get("output_dir", "data/crawler")
+        "output_dir": data.get("output_dir", "data/crawler"),
         "save_mysql": data.get("save_mysql", False),
         "mysql_host": data.get("mysql_host", "localhost"),
         "mysql_port": data.get("mysql_port", 3306),
@@ -815,6 +819,21 @@ def api_reload_dashboard():
     return jsonify({"ok": True, "message": "缓存已清除，下次访问将重新加载"})
 
 
+# ── 图片服务路由 ───────────────────────────────────────────────────────
+
+
+@app.route("/images/poster/<path:filename>")
+def serve_poster_image(filename):
+    """提供电影海报图片。"""
+    return send_from_directory(str(POSTER_IMAGES_DIR), filename)
+
+
+@app.route("/images/analysis/<path:filename>")
+def serve_analysis_image(filename):
+    """提供分析输出图片。"""
+    return send_from_directory(str(ANALYSIS_IMAGES_DIR), filename)
+
+
 # ========================================================================
 #  HTML 构建
 # ========================================================================
@@ -916,10 +935,24 @@ def build_html() -> str:
         <div class="stat-card"><div class="stat-icon">🎯</div><div class="stat-number">{imdb_count}</div><div class="stat-label">IMDb收录</div></div>
     </div>"""
 
+    # 构建电影标题 → 海报文件名映射
+    poster_map = {}
+    if POSTER_IMAGES_DIR.exists():
+        image_files = [f.name for f in POSTER_IMAGES_DIR.iterdir() if f.is_file() and f.suffix.lower() in (".webp", ".jpg", ".jpeg", ".png")]
+        for _, row in df.iterrows():
+            title = str(row.get("title_cn", "") or row.get("title", "")).strip()
+            if not title:
+                continue
+            for fname in image_files:
+                if fname.startswith(title):
+                    poster_map[title] = fname
+                    break
+
     # 表格数据
     table_df = df[["rank", "title_cn", "rating", "comment_count", "genres",
                     "director", "release_year", "runtime", "country", "language", "summary"]].copy()
     table_df.columns = ["排名", "电影名称", "评分", "评论数", "类型", "导演", "年份", "片长(分)", "国家", "语言", "简介"]
+    table_df["海报文件"] = table_df["电影名称"].apply(lambda t: poster_map.get(t, ""))
     table_df = table_df.sort_values("排名")
     table_data = table_df.to_dict(orient="records")
 
@@ -930,6 +963,28 @@ def build_html() -> str:
     genre_options = "\n".join(f'<option value="{g}">{g}</option>' for g in all_genres)
     country_options = "\n".join(f'<option value="{c}">{c}</option>' for c in all_countries)
     decade_options = "\n".join(f'<option value="{d}">{d}s</option>' for d in all_decades)
+
+    # 分析输出图片列表
+    analysis_images = []
+    if ANALYSIS_IMAGES_DIR.exists():
+        for f in sorted(ANALYSIS_IMAGES_DIR.iterdir()):
+            if f.is_file() and f.suffix.lower() in (".png", ".jpg", ".jpeg", ".webp", ".gif") and f.stem not in ("jquery.min", "datatables.min"):
+                analysis_images.append({
+                    "name": f.name,
+                    "stem": f.stem,
+                })
+    analysis_gallery_html = ""
+    if analysis_images:
+        cards = []
+        for img in analysis_images:
+            label = img["stem"].replace("_", " ").replace("-", " ")
+            cards.append(f'''<div class="gallery-item" onclick="openImageViewer('/images/analysis/{img["name"]}', '{label}')">
+                <img src="/images/analysis/{img["name"]}" alt="{label}" loading="lazy">
+                <div class="gallery-caption">{label}</div>
+            </div>''')
+        analysis_gallery_html = f'<div class="gallery-grid">{"".join(cards)}</div>'
+    else:
+        analysis_gallery_html = '<p style="color:var(--text-muted);text-align:center;padding:40px;">暂无分析图片，请先运行分析脚本生成图表。</p>'
 
     # 内嵌依赖
     jquery_js = ""
@@ -1102,6 +1157,17 @@ def build_html() -> str:
   }}
   .modal-close:hover {{ color: var(--red); }}
   .modal h2 {{ margin-bottom: 12px; font-size: 1.5em; }}
+  .modal-movie {{ max-width: 700px; }}
+  .modal-poster {{
+    float: right; width: 160px; margin: 0 0 12px 16px; border-radius: 8px; overflow: hidden;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+  }}
+  .modal-poster img {{
+    width: 100%; display: block; border-radius: 8px;
+    transition: transform 0.3s;
+  }}
+  .modal-poster img:hover {{ transform: scale(1.05); }}
+  .image-viewer-modal {{ max-width: 900px; padding: 20px 24px; }}
   .modal .detail-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 16px 0; }}
   .modal .detail-label {{ color: var(--text-muted); font-size: 0.85em; }}
   .modal .detail-value {{ color: var(--text); font-size: 1em; font-weight: 500; }}
@@ -1178,6 +1244,31 @@ def build_html() -> str:
     .stats-grid {{ grid-template-columns: repeat(2, 1fr); }}
     .filter-panel {{ flex-direction: column; align-items: stretch; }}
     .modal .detail-grid {{ grid-template-columns: 1fr; }}
+    .modal-poster {{ float: none; width: 100%; max-width: 200px; margin: 0 auto 16px; }}
+    .gallery-grid {{ grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }}
+  }}
+
+  /* Gallery */
+  .gallery-grid {{
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 16px;
+  }}
+  .gallery-item {{
+    background: var(--card-bg); border: 1px solid var(--card-border);
+    border-radius: 10px; overflow: hidden; cursor: pointer;
+    transition: transform 0.25s, box-shadow 0.25s;
+  }}
+  .gallery-item:hover {{
+    transform: translateY(-4px);
+    box-shadow: 0 8px 25px rgba(99,110,250,0.25);
+    border-color: var(--accent);
+  }}
+  .gallery-item img {{
+    width: 100%; height: 160px; object-fit: cover; display: block;
+  }}
+  .gallery-caption {{
+    padding: 10px 12px; font-size: 0.82em; color: var(--text-muted);
+    text-align: center; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }}
 </style>
 </head>
@@ -1195,6 +1286,7 @@ def build_html() -> str:
     <button class="tab-btn" onclick="switchTab('geography')">🌍 地域分析</button>
     <button class="tab-btn" onclick="switchTab('people')">👤 人物分析</button>
     <button class="tab-btn" onclick="switchTab('table')">📋 数据表</button>
+    <button class="tab-btn" onclick="switchTab('gallery')">📸 分析图集</button>
     <button class="tab-btn" onclick="switchTab('crawl')">🕷️ 爬虫控制</button>
     <button class="tab-btn" onclick="switchTab('database')">🗄️ 数据库</button>
   </div>
@@ -1291,6 +1383,12 @@ def build_html() -> str:
         <tbody></tbody>
       </table>
     </div>
+  </div>
+
+  <!-- ===== TAB: 分析图集 ===== -->
+  <div class="tab-panel" id="tab-gallery">
+    <h2 class="section-title">📸 数据分析输出图集</h2>
+    {analysis_gallery_html}
   </div>
 
   <!-- ===== TAB: 爬虫控制 ===== -->
@@ -1413,11 +1511,21 @@ def build_html() -> str:
 
   <!-- Movie Detail Modal -->
   <div class="modal-overlay" id="movieModal">
-    <div class="modal">
+    <div class="modal modal-movie">
       <button class="modal-close" onclick="closeModal()">✕</button>
+      <div class="modal-poster" id="modalPoster"></div>
       <h2 id="modalTitle"></h2>
       <div class="detail-grid" id="modalDetails"></div>
       <div class="detail-summary" id="modalSummary"></div>
+    </div>
+  </div>
+
+  <!-- Image Viewer Modal -->
+  <div class="modal-overlay" id="imageViewer" onclick="closeImageViewer()">
+    <div class="modal image-viewer-modal" onclick="event.stopPropagation()">
+      <button class="modal-close" onclick="closeImageViewer()">✕</button>
+      <h3 id="imageViewerTitle" style="margin-bottom:16px;"></h3>
+      <img id="imageViewerImg" src="" alt="" style="width:100%;border-radius:8px;">
     </div>
   </div>
 
@@ -1500,6 +1608,17 @@ function clearFilters() {{
 // ===== 模态框 =====
 function showMovieDetail(rowData) {{
   document.getElementById('modalTitle').textContent = rowData['电影名称'] + ' ★' + rowData['评分'];
+
+  // 海报图片
+  const posterDiv = document.getElementById('modalPoster');
+  const posterFile = rowData['海报文件'] || '';
+  if (posterFile) {{
+    posterDiv.innerHTML = `<img src="/images/poster/${{encodeURIComponent(posterFile)}}" alt="${{rowData['电影名称']}}" loading="lazy" onerror="this.parentElement.style.display='none'">`;
+    posterDiv.style.display = 'block';
+  }} else {{
+    posterDiv.style.display = 'none';
+  }}
+
   const details = [
     {{ label: '排名', value: '#' + rowData['排名'] }},
     {{ label: '评分', value: '★ ' + rowData['评分'] }},
@@ -1525,7 +1644,18 @@ function closeModal() {{
 document.getElementById('movieModal').addEventListener('click', function(e) {{
   if (e.target === this) closeModal();
 }});
-document.addEventListener('keydown', function(e) {{ if (e.key === 'Escape') closeModal(); }});
+document.addEventListener('keydown', function(e) {{ if (e.key === 'Escape') {{ closeModal(); closeImageViewer(); }} }});
+
+// ===== 图片查看器 =====
+function openImageViewer(src, title) {{
+  document.getElementById('imageViewerImg').src = src;
+  document.getElementById('imageViewerTitle').textContent = title || '';
+  document.getElementById('imageViewer').classList.add('show');
+}}
+
+function closeImageViewer() {{
+  document.getElementById('imageViewer').classList.remove('show');
+}}
 
 // ===== 初始化数据表 =====
 $(document).ready(function() {{
@@ -1608,7 +1738,7 @@ function startCrawl() {{
     show_browser: document.getElementById('crawlShowBrowser').checked,
     driver_path: null,
     proxies: document.getElementById('crawlProxy').value.trim() ? [document.getElementById('crawlProxy').value.trim()] : [],
-    output_dir: document.getElementById('crawlOutputDir').value.trim() || 'data/crawler'
+    output_dir: document.getElementById('crawlOutputDir').value.trim() || 'data/crawler',
     save_mysql: document.getElementById('crawlSaveMysql').checked,
     mysql_host: document.getElementById('mysqlHost').value.trim() || 'localhost',
     mysql_port: parseInt(document.getElementById('mysqlPort').value) || 3306,
