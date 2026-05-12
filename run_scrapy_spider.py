@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""Convenient runner for the Scrapy-based Douban crawler.
+"""Scrapy 豆瓣爬虫的便捷启动脚本。
 
-Usage (from project root)::
+用法（在项目根目录执行）::
 
-    # Crawl Top250
+    # 爬取 Top250
     python run_scrapy_spider.py --spider top250 --max-pages 1
 
-    # Custom URLs
+    # 自定义 URL
     python run_scrapy_spider.py --spider custom --urls "https://movie.douban.com/top250?start=0"
 
-    # All options
+    # 所有选项
     python run_scrapy_spider.py --spider top250 --max-pages 2 --comment-limit 10 --no-details
 """
 
@@ -37,7 +37,7 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> None:
     args = build_parser().parse_args()
 
-    # Ensure both project root and scrapy_douban package dir are on sys.path
+    # 确保项目根目录和 scrapy_douban 包目录都在 sys.path 中
     project_root = Path(__file__).resolve().parent
     scrapy_project_dir = project_root / "scrapy_douban"
     for p in [str(project_root), str(scrapy_project_dir)]:
@@ -49,11 +49,11 @@ def main() -> None:
 
     os = __import__("os")
 
-    # Load default settings from scrapy_douban.settings
+    # 从 scrapy_douban.settings 加载默认配置
     os.environ.setdefault("SCRAPY_SETTINGS_MODULE", "scrapy_douban.settings")
     settings = get_project_settings()
 
-    # Apply CLI overrides
+    # 应用命令行参数覆盖
     if args.max_pages is not None:
         settings.set("MAX_PAGES", args.max_pages)
     if args.comment_limit is not None:

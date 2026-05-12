@@ -1,7 +1,7 @@
-"""Scrapy spider that works with arbitrary Douban list/search URLs.
+"""支持任意豆瓣列表/搜索 URL 的 Scrapy 爬虫。
 
-Supports the same URL-expansion logic as the requests version
-(``expand_paginated_urls``) so that a single URL can span multiple pages.
+支持与 requests 版本相同的 URL 展开逻辑（``expand_paginated_urls``），
+使单个 URL 可扩展为多个分页。
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ from requests_douban.parser import (
 )
 
 from ..items import DoubanItem as ScrapyItem
-from .top250 import (  # reuse helpers from top250 spider
+from .top250 import (  # 复用 top250 爬虫的辅助函数
     _deduplicate_comments,
     _mobile_subject_url,
     _parser_to_scrapy,
@@ -31,9 +31,9 @@ from .top250 import (  # reuse helpers from top250 spider
 
 
 class CustomUrlsSpider(scrapy.Spider):
-    """Crawl user-supplied Douban list URLs.
+    """爬取用户提供的豆瓣列表 URL。
 
-    Example::
+    示例::
 
         scrapy crawl custom -a urls="https://movie.douban.com/top250?start=0"
     """
@@ -58,7 +58,7 @@ class CustomUrlsSpider(scrapy.Spider):
         self.page_param = page_param
         self.page_size = int(page_size)
 
-        # Parse comma / newline separated URLs
+        # 解析逗号/换行符分隔的 URL
         raw_urls = [u.strip() for u in urls.split(",") if u.strip()]
         self.start_urls_raw = raw_urls
 
@@ -70,7 +70,7 @@ class CustomUrlsSpider(scrapy.Spider):
         return super().from_crawler(crawler, *args, **kwargs)
 
     # ----------------------------------------------------------------
-    # 1. Build expanded URL list and start requests
+    # 1. 构建展开的 URL 列表并启动请求
     # ----------------------------------------------------------------
 
     async def start_requests(self):
@@ -83,7 +83,7 @@ class CustomUrlsSpider(scrapy.Spider):
                 )
 
     # ----------------------------------------------------------------
-    # 2. Parse list page
+    # 2. 解析列表页
     # ----------------------------------------------------------------
 
     def parse_list(self, response: Response):
@@ -93,11 +93,11 @@ class CustomUrlsSpider(scrapy.Spider):
             yield scrapy_item
 
     # ----------------------------------------------------------------
-    # URL expansion
+    # URL 展开
     # ----------------------------------------------------------------
 
     def _expand_url(self, url: str) -> list[str]:
-        """Expand a single URL into multiple paginated URLs."""
+        """将单个 URL 展开为多个分页 URL。"""
         if self.max_pages <= 1:
             return [url]
 

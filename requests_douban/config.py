@@ -1,4 +1,4 @@
-"""Runtime configuration for the Douban crawler."""
+"""豆瓣爬虫运行时配置。"""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -17,7 +17,7 @@ DEFAULT_USER_AGENTS = (
 
 @dataclass
 class CrawlConfig:
-    """Settings that keep scraping behavior polite and easy to tune."""
+    """控制爬取行为的设置，易于调整。"""
 
     output_dir: Path = Path("data/crawler")
     image_dir: Path = Path("data/crawler/images")

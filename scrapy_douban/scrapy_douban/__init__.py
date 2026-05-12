@@ -1,1 +1,1 @@
-"""Scrapy-based Douban crawler package."""
+"""基于 Scrapy 框架的豆瓣爬虫包。"""

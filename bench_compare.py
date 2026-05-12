@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""Benchmark & comparison script: Scrapy vs Requests Douban crawlers.
+"""豆瓣爬虫基准测试与对比脚本：Scrapy vs Requests。
 
-Runs both crawlers on the Top250 dataset (1 page by default) and compares:
-- elapsed time (total & per-item)
-- items collected
-- success rate (detail & comment enrichment)
-- code complexity (lines of code per module)
+在 Top250 数据集上运行两个爬虫（默认 1 页）并对比：
+- 耗时（总耗时 & 单项平均）
+- 采集条目数
+- 成功率（详情页 & 短评丰富度）
+- 代码复杂度（各模块行数）
 
-Usage::
+用法::
 
     python bench_compare.py --pages 1 --no-images
 """
@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Any
 
 try:
-    import tabulate  # optional; fallback to plain print
+    import tabulate  # 可选依赖；缺失时回退到纯文本输出
 except ModuleNotFoundError:
     tabulate = None  # type: ignore[assignment]
 
@@ -32,7 +32,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 
 
 # ---------------------------------------------------------------------------
-# Helpers
+# 辅助函数
 # ---------------------------------------------------------------------------
 
 def _resolve(p: str) -> str:
@@ -46,7 +46,7 @@ def _run_requests_crawler(
     no_images: bool = True,
     output_dir: str = "data/bench_requests",
 ) -> dict[str, Any]:
-    """Run the requests-based crawler as a subprocess and parse its output."""
+    """以子进程方式运行 requests 爬虫，并解析其输出。"""
 
     cmd = [
         sys.executable,
@@ -79,7 +79,7 @@ def _run_requests_crawler(
     stdout = result.stdout
     stderr = result.stderr
 
-    # Parse output lines like:
+    # 解析输出行，例如：
     #   saved 25 items
     #   json: data/bench_requests/douban_items.json
     #   elapsed: 12.34s
@@ -116,7 +116,7 @@ def _run_scrapy_crawler(
     no_images: bool = True,
     output_dir: str = "data/bench_scrapy",
 ) -> dict[str, Any]:
-    """Run the Scrapy-based crawler as a subprocess and parse its output."""
+    """以子进程方式运行 Scrapy 爬虫，并解析其输出。"""
 
     cmd = [
         sys.executable,
@@ -148,10 +148,10 @@ def _run_scrapy_crawler(
     stdout = result.stdout
     stderr = result.stderr
 
-    # Scrapy outputs log lines; look for item count.
+    # Scrapy 输出日志行；从中查找条目计数。
     items_count = 0
     for line in stdout.splitlines():
-        # "Exported 25 items to ..." from ExportPipeline
+        # ExportPipeline 输出格式如 "Exported 25 items to ..."
         if "Exported" in line and "items to" in line:
             try:
                 items_count = int(line.split()[1])
@@ -170,7 +170,7 @@ def _run_scrapy_crawler(
 
 
 # ---------------------------------------------------------------------------
-# Code complexity summary
+# 代码复杂度统计
 # ---------------------------------------------------------------------------
 
 def _count_lines(paths: list[str]) -> dict[str, int]:
@@ -186,7 +186,7 @@ def _count_lines(paths: list[str]) -> dict[str, int]:
 
 
 # ---------------------------------------------------------------------------
-# Main
+# 主入口
 # ---------------------------------------------------------------------------
 
 def main() -> None:
@@ -237,7 +237,7 @@ def main() -> None:
                 no_images=args.no_images,
             )
             results.append(r)
-            # Print last 20 lines of stdout
+            # 打印最后 20 行 stdout
             lines = r["stdout"].splitlines()
             print("\n".join(lines[-20:]) if len(lines) > 20 else r["stdout"])
             if r["stderr"]:
@@ -247,7 +247,7 @@ def main() -> None:
         print()
 
     # -----------------------------------------------------------------------
-    # Performance comparison table
+    # 性能对比表格
     # -----------------------------------------------------------------------
     if results:
         print("-" * 60)
@@ -270,7 +270,7 @@ def main() -> None:
         print()
 
     # -----------------------------------------------------------------------
-    # Code complexity comparison
+    # 代码复杂度对比
     # -----------------------------------------------------------------------
     print("-" * 60)
     print("Code Complexity (source lines of code)")
@@ -320,7 +320,7 @@ def main() -> None:
     print(f"  {'Scrapy total':50s} {scr_total:>8d}")
     print()
 
-    # (reused parser & cleaner shared with requests version)
+    # Scrapy 复用了 requests 版本的 parser.py 和 cleaner.py
     reused = _count_lines(["requests_douban/parser.py", "requests_douban/cleaner.py"])
     reused_total = sum(reused.values())
     print(f"  (Note: Scrapy reuses parser.py + cleaner.py = {reused_total} lines from requests)")
@@ -328,7 +328,7 @@ def main() -> None:
     print()
 
     # -----------------------------------------------------------------------
-    # Architecture comparison chart
+    # 架构对比图
     # -----------------------------------------------------------------------
     print("-" * 60)
     print("Architecture Comparison")
@@ -358,7 +358,7 @@ def main() -> None:
 """)
 
     print("=" * 60)
-    print("Done. Remember to clean up test data:")
+    print("测试完成。记得清理测试数据：")
     print(f"  rm -rf data/bench_requests data/bench_scrapy")
     print("=" * 60)
 

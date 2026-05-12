@@ -1,7 +1,7 @@
-"""Simple data cleaning pipeline for Douban scraped items.
+"""豆瓣爬取数据的简易清洗管道。
 
-Provides functions to normalize common fields (rating, comment_count, imdb, runtime)
-before saving to file or database.
+提供对常见字段（评分、评论数、IMDb、片长）的规范化函数，
+在保存到文件或数据库之前使用。
 """
 
 from __future__ import annotations
@@ -13,14 +13,14 @@ from .parser import DoubanItem
 
 
 def clean_items(items: list[DoubanItem]) -> list[DoubanItem]:
-    """Apply standard cleaning transforms to a list of DoubanItem (in-place).
+    """对 DoubanItem 列表执行标准清洗（原地修改）。
 
-    Cleans the following fields:
-      - **rank**: converts to ``int`` (e.g. ``1``)
-      - **rating**: converts to ``float`` (e.g. ``9.7``)
-      - **comment_count**: converts to ``int`` (e.g. ``3282402``)
-      - **imdb**: extracts ``ttXXXXXX`` ID, discarding extra text
-      - **runtime**: keeps as ``int`` (minutes)
+    清洗以下字段：
+      - **rank**：转为 ``int``（如 ``1``）
+      - **rating**：转为 ``float``（如 ``9.7``）
+      - **comment_count**：转为 ``int``（如 ``3282402``）
+      - **imdb**：提取 ``ttXXXXXX`` 编号，丢弃多余文本
+      - **runtime**：转为 ``int``（分钟）
     """
     for item in items:
         _clean_text_nbsp(item)
@@ -33,11 +33,11 @@ def clean_items(items: list[DoubanItem]) -> list[DoubanItem]:
 
 
 # ---------------------------------------------------------------------------
-# Internal cleaners
+# 内部清洗函数
 # ---------------------------------------------------------------------------
 
 def _clean_text_nbsp(item: DoubanItem) -> None:
-    """Replace non-breaking spaces (\u00a0) in all string fields with normal space."""
+    """将所有字符串字段中的不间断空格（\u00a0）替换为普通空格。"""
     for f in fields(DoubanItem):
         val = getattr(item, f.name)
         if isinstance(val, str) and "\u00a0" in val:
@@ -49,7 +49,7 @@ def _clean_rank(item: DoubanItem) -> None:
     if rank is None:
         return
     if isinstance(rank, int):
-        return  # already clean
+        return  # 已经是干净数据
     rank = rank.strip()
     if not rank:
         item.rank = None
@@ -78,12 +78,12 @@ def _clean_comment_count(item: DoubanItem) -> None:
     if count is None:
         return
     if isinstance(count, int):
-        return  # already clean
+        return  # 已经是干净数据
     count = count.strip()
     if not count:
         item.comment_count = None
         return
-    # Remove commas first, then extract digits
+    # 去除千位分隔符逗号，然后提取数字
     match = re.search(r"\d+", count.replace(",", ""))
     item.comment_count = int(match.group(0)) if match else None
 
@@ -101,8 +101,8 @@ def _clean_runtime(item: DoubanItem) -> None:
     if runtime is None:
         return
     if isinstance(runtime, int):
-        return  # already clean
-    # String value like "142分钟(国际版)" or "142"
+        return  # 已经是干净数据
+    # 字符串值如 "142分钟(国际版)" 或 "142"
     runtime = runtime.strip()
     if not runtime:
         item.runtime = None

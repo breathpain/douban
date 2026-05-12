@@ -1,4 +1,4 @@
-"""High-level Douban crawler workflow."""
+"""豆瓣爬虫高层工作流。"""
 
 from __future__ import annotations
 
@@ -301,7 +301,7 @@ def save_items(items: list[DoubanItem], output_dir: Path) -> tuple[Path, Path]:
 
 
 def expand_paginated_urls(urls: list[str], config: CrawlConfig) -> list[str]:
-    """Expand custom URLs into multiple pages with a query pagination parameter."""
+    """将自定义 URL 按查询分页参数展开为多页 URL。"""
 
     expanded: list[str] = []
     for url in urls:

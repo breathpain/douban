@@ -1,4 +1,4 @@
-"""Requests-based Douban crawler package."""
+"""基于 requests 库的豆瓣爬虫包。"""
 
 __all__ = ["__version__"]
 

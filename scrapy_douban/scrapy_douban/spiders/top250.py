@@ -1,11 +1,11 @@
-"""Scrapy spider for Douban Movie Top250.
+"""豆瓣电影 Top250 的 Scrapy 爬虫。
 
-Workflow
+工作流程
 --------
-1. Request Top250 list pages (via Scrapy)
-2. Parse list items (via ``requests_douban.parser``)
-3. Enrich movie data & comments via ``requests_douban.crawler.DoubanCrawler``
-   (which handles Desktop→Mobile→Selenium fallback internally)
+1. 通过 Scrapy 请求 Top250 列表页
+2. 通过 ``requests_douban.parser`` 解析列表条目
+3. 通过 ``requests_douban.crawler.DoubanCrawler`` 丰富电影数据和短评
+   （内部处理 Desktop→Mobile→Selenium 回退逻辑）
 """
 
 from __future__ import annotations
@@ -36,16 +36,16 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Spider
+# 爬虫
 # ---------------------------------------------------------------------------
 
 class Top250Spider(scrapy.Spider):
-    """Crawl Douban Movie Top250 list, detail pages and short comments.
+    """爬取豆瓣电影 Top250 列表页、详情页和短评。
 
-    List pages are fetched via Scrapy (fast).
-    Detail + comment enrichment delegates to ``requests_douban``'s
-    ``DoubanCrawler._crawl_detail_item`` logic, which falls back to
-    Selenium when the HTTP client is blocked.
+    列表页通过 Scrapy 获取（速度快）。
+    详情 + 短评丰富化委托给 ``requests_douban`` 的
+    ``DoubanCrawler._crawl_detail_item`` 逻辑，在 HTTP 客户端
+    被封锁时回退到 Selenium。
     """
 
     name = "top250"
@@ -72,7 +72,7 @@ class Top250Spider(scrapy.Spider):
         kwargs.setdefault("crawl_details", str(crawler.settings.getbool("CRAWL_DETAILS", True)))
         spider = super().from_crawler(crawler, *args, **kwargs)
 
-        # Build CrawlConfig from Scrapy settings for requests_douban fallback
+        # 从 Scrapy settings 构建 CrawlConfig 以供 requests_douban 回退使用
         cfg = CrawlConfig(
             request_timeout=crawler.settings.getint("DOWNLOAD_TIMEOUT", 15),
             retry_times=crawler.settings.getint("RETRY_TIMES", 3),
@@ -98,7 +98,7 @@ class Top250Spider(scrapy.Spider):
         return spider
 
     # ----------------------------------------------------------------
-    # 1. Start: Top250 list pages
+    # 1. 启动：Top250 列表页
     # ----------------------------------------------------------------
 
     async def start(self):
@@ -111,7 +111,7 @@ class Top250Spider(scrapy.Spider):
             )
 
     # ----------------------------------------------------------------
-    # 2. Parse list page → enrich details via requests_douban pipeline
+    # 2. 解析列表页 → 通过 requests_douban 管道丰富详情
     # ----------------------------------------------------------------
 
     def parse_list(self, response: Response):
@@ -122,7 +122,7 @@ class Top250Spider(scrapy.Spider):
                 yield _parser_to_scrapy(p_item)
             return
 
-        # Open Selenium renderer once for all detail pages (if needed)
+        # 为所有详情页打开 Selenium 渲染器一次（如需要）
         renderer: SeleniumRenderer | None = None
         try:
             renderer = SeleniumRenderer(self._cfg).__enter__()
@@ -147,14 +147,14 @@ class Top250Spider(scrapy.Spider):
         item: ParserItem,
         renderer: SeleniumRenderer | None,
     ) -> None:
-        """Enrich a single ParserItem with detail + comments.
+        """为单个 ParserItem 丰富详情和短评数据。
 
-        Mirrors ``requests_douban.crawler.DoubanCrawler._crawl_detail_item``.
+        镜像 ``requests_douban.crawler.DoubanCrawler._crawl_detail_item`` 逻辑。
         """
         if not item.url:
             return
 
-        # ---- Detail HTML ----
+        # ---- 详情页 HTML ----
         html = self._fetch_detail_html(item.url, item.source_page, renderer)
         if not html:
             item.detail_error = "failed to fetch detail page via all methods"
@@ -162,7 +162,7 @@ class Top250Spider(scrapy.Spider):
 
         enrich_movie_detail(item, html)
 
-        # ---- Comments (via DoubanCrawler, same logic as requests_douban) ----
+        # ---- 短评（通过 DoubanCrawler，逻辑与 requests_douban 相同）----
         if self.comment_limit > 0:
             self._douban_crawler._crawl_comments(item, html, renderer)
 
@@ -172,8 +172,8 @@ class Top250Spider(scrapy.Spider):
         source_page: str,
         renderer: SeleniumRenderer | None,
     ) -> str | None:
-        """Try HTTP client first, then mobile URL, then Selenium."""
-        # Desktop via HTTP client
+        """先尝试 HTTP 客户端，再尝试移动端 URL，最后 Selenium。"""
+        # 桌面端通过 HTTP 客户端
         try:
             result = self.http_client.get(url, referer=source_page)
             if has_movie_detail_info(result.text):
@@ -183,7 +183,7 @@ class Top250Spider(scrapy.Spider):
         else:
             desktop_err = RuntimeError("desktop detail page has no parseable detail info")
 
-        # Mobile via HTTP client
+        # 移动端通过 HTTP 客户端
         mobile_url = _mobile_subject_url(url)
         if mobile_url:
             try:
@@ -195,7 +195,7 @@ class Top250Spider(scrapy.Spider):
             else:
                 mobile_err = RuntimeError("mobile detail page has no parseable detail info")
 
-        # Selenium fallback
+        # Selenium 回退
         if renderer is not None:
             try:
                 result = renderer.render(url)
@@ -216,7 +216,7 @@ class Top250Spider(scrapy.Spider):
 
 
 # ---------------------------------------------------------------------------
-# Helper functions
+# 辅助函数
 # ---------------------------------------------------------------------------
 
 def _parser_to_scrapy(p: ParserItem) -> ScrapyItem:
@@ -235,7 +235,7 @@ def _mobile_subject_url(url: str) -> str:
 
 
 def _deduplicate_comments(existing: list[str], incoming: list[str]) -> list[str]:
-    """Merge two comment lists, deduplicating by comment text."""
+    """合并两份评论列表，按评论文本去重。"""
     seen: set[str] = set()
     result: list[str] = []
     for comment in existing + incoming:
@@ -247,7 +247,7 @@ def _deduplicate_comments(existing: list[str], incoming: list[str]) -> list[str]
 
 
 def _comment_key(comment: str) -> str:
-    """Extract a dedup key (comment text) from a formatted comment string."""
+    """从格式化评论字符串中提取去重 key（评论文本）。"""
     match = re.search(r"评论：(.*)", comment)
     if match:
         text = match.group(1).strip()

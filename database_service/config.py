@@ -1,4 +1,4 @@
-"""MySQL connection configuration for member B."""
+"""数据库服务 MySQL 连接配置。"""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 
 @dataclass
 class MySQLConfig:
-    """Database connection settings."""
+    """数据库连接设置。"""
 
     host: str = "localhost"
     port: int = 3306
@@ -17,7 +17,7 @@ class MySQLConfig:
     charset: str = "utf8mb4"
 
     backup_dir: str = "data/database/backup"
-    """Output directory for JSON / CSV backup files exported from MySQL."""
+    """从 MySQL 导出的 JSON / CSV 备份文件的输出目录。"""
 
     @property
     def dsn(self) -> str:

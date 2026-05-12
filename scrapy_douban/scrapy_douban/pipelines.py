@@ -1,9 +1,9 @@
-"""Item pipelines for the Douban Scrapy crawler.
+"""豆瓣 Scrapy 爬虫的 Item 管道。
 
-Pipelines (in order):
-1. ``CleaningPipeline`` – normalise numeric fields (reuse ``cleaner.py``)
-2. ``ImageDownloadPipeline`` – download poster images
-3. ``ExportPipeline`` – persist items as JSON + CSV on spider close
+管道（按顺序）：
+1. ``CleaningPipeline`` – 规范化数字字段（复用 ``cleaner.py``）
+2. ``ImageDownloadPipeline`` – 下载海报图片
+3. ``ExportPipeline`` – 爬虫关闭时将数据持久化为 JSON + CSV
 """
 
 from __future__ import annotations
@@ -33,11 +33,11 @@ except ImportError:
 
 
 # ---------------------------------------------------------------------------
-# Helper: convert Scrapy Item <-> Parser dataclass Item
+# 辅助函数：Scrapy Item ↔ Parser 数据类 Item 互转
 # ---------------------------------------------------------------------------
 
 def _scrapy_item_to_parser_dict(scrapy_item) -> dict[str, Any]:
-    """Convert a Scrapy ``DoubanItem`` into a plain dict for cleaning."""
+    """将 Scrapy ``DoubanItem`` 转为普通字典以进行清洗。"""
     result: dict[str, Any] = {}
     for k in scrapy_item.fields:
         result[k] = scrapy_item.get(k)
@@ -45,7 +45,7 @@ def _scrapy_item_to_parser_dict(scrapy_item) -> dict[str, Any]:
 
 
 def _dict_to_parser_item(data: dict[str, Any]) -> Any:
-    """Rebuild a parser ``DoubanItem`` from a dict so cleaner can handle it."""
+    """从字典重建 parser ``DoubanItem``，以便清洗器处理。"""
     if ParserItem is None:
         return data
     title = data.get("title") or ""
@@ -59,18 +59,18 @@ def _dict_to_parser_item(data: dict[str, Any]) -> Any:
 
 
 # ---------------------------------------------------------------------------
-# Pipeline 1: Cleaning
+# 管道 1：数据清洗
 # ---------------------------------------------------------------------------
 
 class CleaningPipeline:
-    """Apply the same cleaning transforms as the requests version."""
+    """应用与 requests 版本相同的清洗转换。"""
 
     def process_item(self, item, spider: Spider) -> Any:
         data = _scrapy_item_to_parser_dict(item)
         parser_item = _dict_to_parser_item(data)
         _clean_parser_items([parser_item])
 
-        # Write cleaned values back to the Scrapy Item
+        # 将清洗后的值写回 Scrapy Item
         cleaned = asdict(parser_item) if hasattr(parser_item, "__dataclass_fields__") else data
         for k in item.fields:
             if k in cleaned:
@@ -79,13 +79,13 @@ class CleaningPipeline:
 
 
 # ---------------------------------------------------------------------------
-# Pipeline 2: Image Download
+# 管道 2：图片下载
 # ---------------------------------------------------------------------------
 
 class ImageDownloadPipeline:
-    """Download poster images for each item.
+    """为每个条目下载海报图片。
 
-    Skipped when ``settings.DOWNLOAD_IMAGES`` is ``False``.
+    当 ``settings.DOWNLOAD_IMAGES`` 为 ``False`` 时跳过。
     """
 
     def __init__(self, enabled: bool, image_dir: str | None) -> None:
@@ -106,7 +106,7 @@ class ImageDownloadPipeline:
         filename_stem = item.get("title") or None
 
         from requests_douban.config import CrawlConfig as _Cfg
-        # Build a minimal config for image_downloader
+        # 为 image_downloader 构建一个最小配置
         cfg = _Cfg(
             image_dir=self.image_dir or Path("data/crawler/images"),
             proxies=None,
@@ -120,14 +120,14 @@ class ImageDownloadPipeline:
 
 
 # ---------------------------------------------------------------------------
-# Pipeline 3: Export JSON / CSV
+# 管道 3：导出 JSON / CSV
 # ---------------------------------------------------------------------------
 
 class ExportPipeline:
-    """Accumulate items and write JSON + CSV on spider close.
+    """累积条目，在爬虫关闭时将数据写为 JSON + CSV。
 
-    Output files are written to ``settings.EXPORT_DIR`` (default
-    ``data/crawler``) as ``douban_items.json`` and ``douban_items.csv``.
+    输出文件写入 ``settings.EXPORT_DIR``（默认 ``data/crawler``），
+    文件名为 ``douban_items.json`` 和 ``douban_items.csv``。
     """
 
     def __init__(self, export_dir: str) -> None:
@@ -139,7 +139,7 @@ class ExportPipeline:
         export_dir = crawler.settings.get("EXPORT_DIR", "data/crawler")
         pipeline = cls(export_dir)
 
-        # Connect to spider_closed signal
+        # 连接到 spider_closed 信号
         crawler.signals.connect(pipeline.spider_closed, signal=signals.spider_closed)
         return pipeline
 

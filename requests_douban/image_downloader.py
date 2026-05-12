@@ -1,4 +1,4 @@
-"""Image download utilities."""
+"""图片下载工具。"""
 
 from __future__ import annotations
 

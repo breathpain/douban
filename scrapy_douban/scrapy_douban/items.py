@@ -1,14 +1,14 @@
-"""Scrapy Item definitions for Douban crawler.
+"""豆瓣爬虫 Scrapy Item 定义。
 
-Each field maps 1:1 to the original DoubanItem dataclass in requests_douban.parser,
-allowing seamless conversion between the two representations.
+每个字段与 requests_douban.parser 中原有的 DoubanItem 数据类一一对应，
+允许两个表示之间无缝转换。
 """
 
 import scrapy
 
 
 class DoubanItem(scrapy.Item):
-    """Scrapy Item for a Douban movie entry with full detail info."""
+    """豆瓣电影条目的 Scrapy Item，包含完整详情信息。"""
 
     title = scrapy.Field()
     url = scrapy.Field()

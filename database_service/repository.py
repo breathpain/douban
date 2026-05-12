@@ -1,4 +1,4 @@
-"""Data-access layer: insert movies & comments into MySQL."""
+"""数据访问层：将电影和短评写入 MySQL。"""
 
 from __future__ import annotations
 
@@ -12,19 +12,19 @@ def save_movies_with_comments(
     cfg: MySQLConfig, items: list[dict], *, recreate: bool = False
 ) -> int:
     """
-    Insert movie records (and their short comments) into MySQL.
+    将电影记录（及其短评）写入 MySQL。
 
     Parameters
     ----------
     cfg : MySQLConfig
-        Database connection settings.
+        数据库连接设置。
     items : list[dict]
-        Movie dicts as produced by ``DoubanItem.to_dict()``.
+        由 ``DoubanItem.to_dict()`` 生成的电影字典列表。
     recreate : bool
-        If True, drop & recreate tables before inserting (used for full import).
-        If False, check URL existence and skip duplicates (used for crawl).
+        如果为 True，入库前先删除并重建表（用于全量导入）。
+        如果为 False，检查 URL 是否存在并跳过重复数据（用于增量爬取）。
 
-    Returns the number of movies actually inserted (excludes duplicates).
+    返回实际插入的电影数量（不含重复数据）。
     """
     init_database(cfg)
     if recreate:
@@ -52,12 +52,12 @@ def save_movies_with_comments(
 
 
 # ---------------------------------------------------------------------------
-# Internal helpers
+# 内部辅助函数
 # ---------------------------------------------------------------------------
 
 
 def _movie_exists(cur, url: str) -> bool:
-    """Return True if a movie with the given URL already exists."""
+    """检查给定 URL 的电影是否已存在，返回 True 表示已存在。"""
     cur.execute("SELECT 1 FROM movies WHERE url = %s", (url,))
     return cur.fetchone() is not None
 
@@ -88,9 +88,9 @@ INSERT_COMMENT_SQL = """
 
 
 def _upsert_movie(cur, item: dict) -> int | None:
-    """Insert or update a movie; return its id (or None on failure)."""
+    """插入或更新一条电影记录，返回其 id（失败则返回 None）。"""
 
-    # Only keep fields that match the movies table columns
+    # 仅保留与 movies 表列匹配的字段
     fields = {
         "rank": item.get("rank"),
         "title": (item.get("title") or "")[:255],
@@ -121,11 +121,11 @@ def _upsert_movie(cur, item: dict) -> int | None:
 
 def _parse_comment_line(line: str) -> dict[str, str]:
     """
-    Parse a single raw comment line into its component fields.
+    将一行原始评论字符串解析为组成部分字段。
 
-    Expected format:
+    预期格式：
         用户：xxx | 评分：xxx | 时间：xxx | 有用：xxx | 评论：xxx
-    Some fields (e.g. 评分) may be missing.
+    某些字段（如评分）可能不出现。
     """
     fields = {
         "用户": "user",
@@ -156,7 +156,7 @@ def _parse_comment_line(line: str) -> dict[str, str]:
 
 
 def _save_comments(cur, movie_id: int, raw_comments: str) -> None:
-    """Split ``short_comments`` by newline, parse each, and insert into the comments table."""
+    """将 ``short_comments`` 按换行符拆分，逐条解析并写入 comments 表。"""
     if not raw_comments:
         return
 
@@ -171,7 +171,7 @@ def _save_comments(cur, movie_id: int, raw_comments: str) -> None:
             continue
         seen.add(key)
 
-        # Convert helpful to int (or None if empty)
+        # 将 helpful 转为 int（空值则为 None）
         helpful_raw = parsed["helpful"].strip()
         helpful_val: int | None = int(helpful_raw) if helpful_raw else None
 

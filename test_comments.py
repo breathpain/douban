@@ -1,4 +1,4 @@
-"""Test parse_movie_comments on real Douban comments pages."""
+"""在真实豆瓣短评页面上测试 parse_movie_comments 解析函数。"""
 import sys
 sys.path.insert(0, '.')
 
@@ -16,7 +16,7 @@ cfg = CrawlConfig(
     use_selenium=True, selenium_headless=True,
 )
 
-# --- Test 1: HTTP client ---
+# --- 测试 1：HTTP 客户端 ---
 client = DoubanHttpClient(cfg)
 url = 'https://movie.douban.com/subject/1292052/comments?' + urlencode({'status': 'P'})
 
@@ -38,7 +38,7 @@ try:
 except Exception as e:
     print('ERROR:', e)
 
-# --- Test 2: Selenium ---
+# --- 测试 2：Selenium 渲染 ---
 print()
 print('=' * 60)
 print('TEST 2: Selenium render_comments')
@@ -59,7 +59,7 @@ except Exception as e:
     import traceback
     traceback.print_exc()
 
-# --- Test 3: Selenium render (no render_comments) ---
+# --- 测试 3：Selenium 普通渲染（不使用 render_comments）---
 print()
 print('=' * 60)
 print('TEST 3: Selenium render (plain)')

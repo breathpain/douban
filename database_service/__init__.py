@@ -1,3 +1,4 @@
+"""数据库服务包 —— MySQL 存储与备份导出。"""
 from __future__ import annotations
 
 from .config import MySQLConfig
@@ -23,22 +24,22 @@ def save_to_mysql(
     backup_dir: str = "data/database/backup",
 ) -> int:
     """
-    Unified entry: save items to MySQL, then export JSON / CSV backups.
+    统一入口：将数据存入 MySQL，并导出 JSON / CSV 备份。
 
     Parameters
     ----------
     items : list[dict]
-        Movie dicts as produced by ``DoubanItem.to_dict()``.
+        由 ``DoubanItem.to_dict()`` 生成的电影字典列表。
     recreate : bool
-        If True, drop & recreate tables before inserting (used for full import).
+        如果为 True，入库前先删除并重建表（用于全量导入）。
     host, port, user, password, database :
-        MySQL connection parameters.
+        MySQL 连接参数。
     backup_dir :
-        Where to write backup files.
+        备份文件输出目录。
 
     Returns
     -------
-    Number of movies inserted into MySQL.
+    实际写入 MySQL 的电影数量。
     """
     cfg = MySQLConfig(
         host=host,

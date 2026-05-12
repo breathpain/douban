@@ -1,4 +1,4 @@
-"""Database initialisation and connection management."""
+"""数据库初始化和连接管理。"""
 
 from __future__ import annotations
 
@@ -62,19 +62,19 @@ CREATE TABLE IF NOT EXISTS comments (
 
 
 def get_connection(cfg: MySQLConfig) -> Any:
-    """Return a pymysql connection to the configured database."""
+    """返回一个指向已配置数据库的 pymysql 连接。"""
     return pymysql.connect(**cfg.connect_kwargs)  # type: ignore[arg-type]
 
 
 def get_dict_connection(cfg: MySQLConfig) -> Any:
-    """Return a pymysql connection that yields rows as dicts."""
+    """返回一个以字典形式返回查询结果的 pymysql 连接。"""
     return pymysql.connect(
         cursorclass=DictCursor, **cfg.connect_kwargs  # type: ignore[arg-type]
     )
 
 
 def init_database(cfg: MySQLConfig) -> None:
-    """Create the database if it does not exist (connect without db name)."""
+    """如果数据库不存在则创建（不指定数据库名进行连接）。"""
     kwargs = {k: v for k, v in cfg.connect_kwargs.items() if k != "database"}
     conn = pymysql.connect(**kwargs)  # type: ignore[arg-type]
     try:
@@ -86,7 +86,7 @@ def init_database(cfg: MySQLConfig) -> None:
 
 
 def drop_tables(cfg: MySQLConfig) -> None:
-    """Drop comments & movies tables (in child-first order for FK constraints)."""
+    """删除 comments 表和 movies 表（遵从外键约束，先删子表）。"""
     conn = get_connection(cfg)
     try:
         with conn.cursor() as cur:
@@ -102,7 +102,7 @@ MIGRATE_MOVIES_SQL = [
     "ALTER TABLE movies MODIFY COLUMN `rating` DECIMAL(3,1) DEFAULT NULL",
     "ALTER TABLE movies MODIFY COLUMN `comment_count` INT DEFAULT NULL",
 ]
-"""ALTER TABLE statements to migrate existing databases to numeric columns."""
+"""用于将现有数据库列迁移为数字类型的 ALTER TABLE 语句。"""
 
 MIGRATE_COMMENTS_SQL = [
     "ALTER TABLE comments MODIFY COLUMN `helpful` INT DEFAULT NULL",
@@ -110,10 +110,10 @@ MIGRATE_COMMENTS_SQL = [
 
 
 def migrate_schema(cfg: MySQLConfig) -> None:
-    """Migrate existing tables columns from VARCHAR to numeric types.
+    """将现有表的 VARCHAR 列迁移为数字类型。
 
-    This is safe to call on already-migrated tables; each ALTER TABLE
-    is a no-op when the column already has the target type.
+    对已迁移的表调用也是安全的；当列已经是目标类型时，
+    每个 ALTER TABLE 语句不产生实际效果。
     """
     conn = get_connection(cfg)
     try:
@@ -122,14 +122,14 @@ def migrate_schema(cfg: MySQLConfig) -> None:
                 try:
                     cur.execute(sql)
                 except Exception:
-                    pass  # column may already be the target type
+                    pass  # 列可能已经是目标类型，无需迁移
         conn.commit()
     finally:
         conn.close()
 
 
 def create_tables(cfg: MySQLConfig) -> None:
-    """Create movies & comments tables if they do not already exist."""
+    """如果 movies 表和 comments 表尚不存在则创建。"""
     conn = get_connection(cfg)
     try:
         with conn.cursor() as cur:

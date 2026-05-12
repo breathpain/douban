@@ -1,4 +1,4 @@
-"""Requests-based client with retry, delay, cookies, and rotating headers."""
+"""基于 requests 的 HTTP 客户端，支持重试、延迟、Cookie 和轮换请求头。"""
 
 from __future__ import annotations
 
@@ -29,14 +29,14 @@ DOUBAN_REFERER: Final = "https://www.douban.com/"
 
 
 class BlockedByDoubanError(RuntimeError):
-    """Raised when Douban returns an obvious anti-spider page."""
+    """当豆瓣返回了明显的反爬虫页面时抛出。"""
 
 
 _TITLE_RE = re.compile(r"<title[^>]*>(.*?)</title>", re.IGNORECASE | re.DOTALL)
 
 
 def _extract_title(html: str) -> str:
-    """Extract the <title> text from HTML."""
+    """从 HTML 中提取 <title> 标签内的文本。"""
     match = _TITLE_RE.search(html)
     return match.group(1).strip() if match else ""
 
@@ -84,13 +84,13 @@ class DoubanHttpClient:
                     raise BlockedByDoubanError(
                         f"blocked by Douban, status={response.status_code}, url={url}"
                     )
-                # Check page title for anti-spider / error pages
+                # 检查页面标题是否为反爬虫/错误页面
                 title = _extract_title(text)
                 if title and any(p in title for p in BLOCK_TITLE_PATTERNS):
                     raise BlockedByDoubanError(
                         f"blocked by Douban, suspicious title={title!r}, url={url}"
                     )
-                # Detect redirects to login / security pages
+                # 检测是否重定向到登录/安全验证页面
                 original_path = url.split("?")[0].rstrip("/")
                 final_path = response.url.split("?")[0].rstrip("/")
                 if (

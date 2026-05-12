@@ -1,4 +1,4 @@
-"""Optional Selenium renderer for JavaScript-heavy or blocked pages."""
+"""可选的 Selenium 渲染器，用于处理 JavaScript 重页面或被封锁的页面。"""
 
 from __future__ import annotations
 

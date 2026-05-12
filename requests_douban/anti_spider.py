@@ -1,4 +1,4 @@
-"""Small anti-spider helpers for respectful crawling."""
+"""反爬虫小工具，帮助实现礼貌爬取。"""
 from __future__ import annotations
 
 import random

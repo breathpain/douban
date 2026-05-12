@@ -1,4 +1,4 @@
-"""Command line entry point for requests_douban."""
+"""requests_douban 命令行入口。"""
 from __future__ import annotations
 
 import argparse
@@ -14,12 +14,12 @@ from .parser import DoubanItem
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Member A Douban crawler")
+    parser = argparse.ArgumentParser(description="requests_douban 豆瓣爬虫")
     parser.add_argument(
         "--mode",
         choices=("top250", "urls", "import"),
         default="top250",
-        help="Crawl Douban movie Top250, custom URLs, or import existing data from JSON/CSV.",
+        help="爬取模式：豆瓣电影 Top250、自定义 URL 或从 JSON/CSV 导入已有数据。",
     )
     parser.add_argument("--url", action="append", default=[], help="Custom Douban URL.")
     parser.add_argument("--max-pages", type=int, default=1, help="Maximum pages to crawl.")
@@ -34,13 +34,13 @@ def build_parser() -> argparse.ArgumentParser:
         "--comment-limit",
         type=int,
         default=20,
-        help="Short comments to crawl for each movie. Use 0 to skip comments.",
+        help="每个电影的短评采集条数。设为 0 则跳过短评。",
     )
     parser.add_argument(
         "--detail-workers",
         type=int,
         default=1,
-        help="Concurrent workers for movie detail and comment pages. Selenium mode stays sequential.",
+        help="详情页和短评页的并发工作线程数。Selenium 模式下保持顺序执行。",
     )
     parser.add_argument("--delay-min", type=float, default=1.2, help="Minimum delay seconds.")
     parser.add_argument("--delay-max", type=float, default=3.5, help="Maximum delay seconds.")
@@ -61,24 +61,24 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--fast",
         action="store_true",
-        help="Use a faster preset for demos: 4 detail workers, 6 image workers, 0.5-1.5s delay.",
+        help="快捷模式预设：4 详情线程、6 图片线程、0.5-1.5秒延迟。",
     )
     parser.add_argument(
         "--image-workers",
         type=int,
         default=1,
-        help="Concurrent workers for poster downloads.",
+        help="封面图片下载的并发工作线程数。",
     )
     parser.add_argument(
         "--page-param",
         default="start",
-        help="Query parameter used for custom URL pagination, such as start or page.",
+        help="自定义 URL 分页所使用的查询参数名，例如 start 或 page。",
     )
     parser.add_argument(
         "--page-size",
         type=int,
         default=25,
-        help="Offset step for start-style pagination.",
+        help="start 风格分页的偏移步长。",
     )
     return parser
 
@@ -158,7 +158,7 @@ def main() -> None:
 
 
 def _run_import(output_dir: Path, save_mysql: bool) -> None:
-    """Import items from local JSON/CSV and optionally write to MySQL."""
+    """从本地 JSON/CSV 文件导入数据，可选写入 MySQL。"""
     json_path = output_dir / "douban_items.json"
     csv_path = output_dir / "douban_items.csv"
 
@@ -174,7 +174,7 @@ def _run_import(output_dir: Path, save_mysql: bool) -> None:
 
     items = []
     for d in raw_data:
-        # Convert empty runtime strings back to None
+        # 将空的 runtime 字符串还原为 None
         if "runtime" in d and d["runtime"] == "":
             d["runtime"] = None
         items.append(DoubanItem(**d))
@@ -187,7 +187,7 @@ def _run_import(output_dir: Path, save_mysql: bool) -> None:
 
 
 def _save_to_mysql(items: list[DoubanItem], *, recreate: bool = False) -> int:
-    """Save cleaned DoubanItem list into MySQL and export backups."""
+    """将清洗后的 DoubanItem 列表存入 MySQL 并导出备份。"""
     try:
         from database_service import save_to_mysql
 

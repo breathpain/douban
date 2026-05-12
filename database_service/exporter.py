@@ -1,4 +1,4 @@
-"""Export MySQL data to JSON / CSV backup files."""
+"""将 MySQL 数据导出为 JSON / CSV 备份文件。"""
 
 from __future__ import annotations
 
@@ -14,9 +14,9 @@ from .database import get_dict_connection
 
 def export_backup(cfg: MySQLConfig) -> tuple[Path, Path, Path]:
     """
-    Read all movies and comments from MySQL and write backup files.
+    从 MySQL 读取所有电影和短评数据，写出备份文件。
 
-    Returns (json_path, movies_csv_path, comments_csv_path).
+    返回 (json_path, movies_csv_path, comments_csv_path)。
     """
     movies = _fetch_movies_with_comments(cfg)
 
@@ -42,7 +42,7 @@ def export_backup(cfg: MySQLConfig) -> tuple[Path, Path, Path]:
 
 
 def _fetch_movies_with_comments(cfg: MySQLConfig) -> list[dict[str, Any]]:
-    """Fetch every movie row and attach its comments as a nested list of dicts."""
+    """获取所有电影行，并将对应短评作为嵌套字典列表附加到每部电影上。"""
     conn = get_dict_connection(cfg)
     try:
         with conn.cursor() as cur:
@@ -75,7 +75,7 @@ def _fetch_movies_with_comments(cfg: MySQLConfig) -> list[dict[str, Any]]:
 
 
 def _convert_decimal_row(row: dict[str, Any]) -> dict[str, Any]:
-    """Convert Decimal values to float so the row is JSON-serializable."""
+    """将 Decimal 值转为 float，使行数据可被 JSON 序列化。"""
     return {
         k: float(v) if isinstance(v, Decimal) else v
         for k, v in row.items()

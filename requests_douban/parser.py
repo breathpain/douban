@@ -1,4 +1,4 @@
-"""Parsers for Douban list/search and movie detail pages."""
+"""豆瓣列表/搜索结果页和电影详情页的解析器。"""
 
 from __future__ import annotations
 
@@ -62,7 +62,7 @@ class DoubanItem:
 
 
 def parse_douban_items(html: str, source_url: str) -> list[DoubanItem]:
-    """Parse common Douban list pages, especially movie Top250 pages."""
+    """解析常见的豆瓣列表页，特别是电影 Top250 页面。"""
 
     soup = BeautifulSoup(html, "lxml")
     items = list(_parse_movie_top250(soup, source_url))
@@ -77,7 +77,7 @@ def has_movie_detail_info(html: str) -> bool:
 
 
 def enrich_movie_detail(item: DoubanItem, html: str) -> DoubanItem:
-    """Fill a list item with fields parsed from a Douban movie detail page."""
+    """用豆瓣电影详情页解析出的字段填充列表条目。"""
 
     soup = BeautifulSoup(html, "lxml")
     info = soup.select_one("#info")
@@ -127,7 +127,7 @@ def enrich_movie_detail(item: DoubanItem, html: str) -> DoubanItem:
 
 
 def parse_movie_comments(html: str, limit: int) -> list[str]:
-    """Parse Douban short comments from detail or comments pages."""
+    """解析豆瓣详情页或短评页中的短评。"""
 
     if limit <= 0:
         return []
@@ -160,7 +160,7 @@ def parse_movie_comments(html: str, limit: int) -> list[str]:
 
 
 def has_next_page(html: str) -> bool:
-    """Check if the comments page has a 'next page' link in the paginator."""
+    """检查短评页的分页器中是否有"后页"链接。"""
     soup = BeautifulSoup(html, "lxml")
     paginator = soup.select_one("#paginator")
     if paginator:
@@ -455,24 +455,24 @@ def _value_after_label(label_node: Tag) -> str:
 
 
 def _normalize_space(text: str) -> str:
-    # Replace non-breaking spaces before collapsing other whitespace
+    # 在折叠其他空白之前，先将不间断空格替换为普通空格
     text = text.replace("\u00a0", " ")
     return re.sub(r"\s+", " ", text).strip()
 
 
 # ---------------------------------------------------------------------------
-# Rexxar API comment parser (used by Scrapy spider)
+# Rexxar API 短评解析器（供 Scrapy 爬虫使用）
 # ---------------------------------------------------------------------------
 
 def parse_rexxar_comments(text: str, limit: int) -> list[str]:
-    """Parse short comments from a Rexxar API JSON response (mobile API).
+    """解析 Rexxar API JSON 响应中的短评（移动端接口）。
 
     Args:
-        text: JSON body of the Rexxar ``/interests`` endpoint.
-        limit: Maximum number of comments to return.
+        text: Rexxar ``/interests`` 端点的 JSON 响应体。
+        limit: 返回的最大评论条数。
 
     Returns:
-        A list of comment strings in the same format as ``parse_movie_comments``.
+        与 ``parse_movie_comments`` 格式相同的评论字符串列表。
     """
     if limit <= 0:
         return []
