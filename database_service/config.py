@@ -16,7 +16,7 @@ class MySQLConfig:
     database: str = "douban"
     charset: str = "utf8mb4"
 
-    backup_dir: str = "data/member_b/backup"
+    backup_dir: str = "data/database/backup"
     """Output directory for JSON / CSV backup files exported from MySQL."""
 
     @property

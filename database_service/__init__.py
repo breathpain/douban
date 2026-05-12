@@ -20,7 +20,7 @@ def save_to_mysql(
     user: str = "root",
     password: str = "123456",
     database: str = "douban",
-    backup_dir: str = "data/member_b/backup",
+    backup_dir: str = "data/database/backup",
 ) -> int:
     """
     Unified entry: save items to MySQL, then export JSON / CSV backups.

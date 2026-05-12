@@ -8,7 +8,7 @@
   2. 统计分析（高分Top10、导演/类型分布、评分与评论数相关性、短评情感倾向）
   3. 可视化（评分分布直方图、类型饼图、散点图、短评词云、时间趋势线图）
 
-数据源：data/member_b/backup/douban_movies.json
+数据源：data/database/backup/douban_movies.json
 输出目录：analysis/output/
 """
 
@@ -92,7 +92,7 @@ warnings.filterwarnings("ignore")
 # ========== 路径配置 ==========
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(BASE_DIR)
-DATA_FILE = os.path.join(PROJECT_ROOT, "data", "member_b", "backup", "douban_movies.json")
+DATA_FILE = os.path.join(PROJECT_ROOT, "data", "database", "backup", "douban_movies.json")
 OUTPUT_DIR = os.path.join(BASE_DIR, "output")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 

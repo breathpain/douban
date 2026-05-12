@@ -23,7 +23,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--url", action="append", default=[], help="Custom Douban URL.")
     parser.add_argument("--max-pages", type=int, default=1, help="Maximum pages to crawl.")
-    parser.add_argument("--output-dir", default="data/member_a", help="Output directory.")
+    parser.add_argument("--output-dir", default="data/crawler", help="Output directory.")
     parser.add_argument("--cookie", default=None, help="Douban cookie string for logged-in pages.")
     parser.add_argument("--use-selenium", action="store_true", help="Enable Selenium fallback.")
     parser.add_argument("--show-browser", action="store_true", help="Run Selenium with visible Chrome.")
@@ -152,7 +152,7 @@ def main() -> None:
     print(f"csv: {csv_path}")
     if args.save_mysql:
         print(f"saved {len(items)} items into MySQL")
-        print(f"backup exported to data/member_b/backup/")
+        print(f"backup exported to data/database/backup/")
     print(f"elapsed: {elapsed:.2f}s")
     print(f"avg per item: {avg_time:.2f}s")
 
@@ -193,7 +193,7 @@ def _save_to_mysql(items: list[DoubanItem], *, recreate: bool = False) -> int:
 
         inserted = save_to_mysql([item.to_dict() for item in items], recreate=recreate)
         print(f"saved {inserted} items into MySQL")
-        print(f"backup exported to data/member_b/backup/")
+        print(f"backup exported to data/database/backup/")
         return inserted
     except ImportError as exc:
         raise SystemExit(

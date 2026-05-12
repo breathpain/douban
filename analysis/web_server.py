@@ -67,7 +67,7 @@ JQUERY_PATH = OUTPUT_DIR / "jquery.min.js"
 DATATABLES_JS_PATH = OUTPUT_DIR / "datatables.min.js"
 DATATABLES_CSS_PATH = OUTPUT_DIR / "datatables.min.css"
 
-DATA_FILE = PROJECT_ROOT / "data" / "member_b" / "backup" / "douban_movies.json"
+DATA_FILE = PROJECT_ROOT / "data" / "database" / "backup" / "douban_movies.json"
 
 RATING_MAP = {"力荐": 5, "推荐": 4, "还行": 3, "较差": 2, "很差": 1, "": np.nan}
 
@@ -701,14 +701,14 @@ def api_crawl_start():
         "show_browser": data.get("show_browser", False),
         "driver_path": data.get("driver_path") or None,
         "proxies": data.get("proxies", []),
-        "output_dir": data.get("output_dir", "data/member_a"),
+        "output_dir": data.get("output_dir", "data/crawler")
         "save_mysql": data.get("save_mysql", False),
         "mysql_host": data.get("mysql_host", "localhost"),
         "mysql_port": data.get("mysql_port", 3306),
         "mysql_user": data.get("mysql_user", "root"),
         "mysql_password": data.get("mysql_password", "123456"),
         "mysql_database": data.get("mysql_database", "douban"),
-        "mysql_backup_dir": data.get("mysql_backup_dir", "data/member_b/backup"),
+        "mysql_backup_dir": data.get("mysql_backup_dir", "data/database/backup")
     }
 
     _crawl_thread = threading.Thread(target=_run_crawl_in_thread, args=(cfg,), daemon=True)
@@ -1320,7 +1320,7 @@ def build_html() -> str:
         </div>
         <div class="form-row">
           <label>输出目录:</label>
-          <input type="text" id="crawlOutputDir" value="data/member_a" style="flex:1">
+          <input type="text" id="crawlOutputDir" value="data/crawler" style="flex:1">
         </div>
         <div class="form-row">
           <label style="display:flex;align-items:center;gap:6px;">
@@ -1608,14 +1608,14 @@ function startCrawl() {{
     show_browser: document.getElementById('crawlShowBrowser').checked,
     driver_path: null,
     proxies: document.getElementById('crawlProxy').value.trim() ? [document.getElementById('crawlProxy').value.trim()] : [],
-    output_dir: document.getElementById('crawlOutputDir').value.trim() || 'data/member_a',
+    output_dir: document.getElementById('crawlOutputDir').value.trim() || 'data/crawler'
     save_mysql: document.getElementById('crawlSaveMysql').checked,
     mysql_host: document.getElementById('mysqlHost').value.trim() || 'localhost',
     mysql_port: parseInt(document.getElementById('mysqlPort').value) || 3306,
     mysql_user: document.getElementById('mysqlUser').value.trim() || 'root',
     mysql_password: document.getElementById('mysqlPassword').value || '123456',
     mysql_database: document.getElementById('mysqlDatabase').value.trim() || 'douban',
-    mysql_backup_dir: 'data/member_b/backup',
+    mysql_backup_dir: 'data/database/backup'
   }};
 
   document.getElementById('btnCrawlStart').disabled = true;

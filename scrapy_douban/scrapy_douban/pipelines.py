@@ -95,7 +95,7 @@ class ImageDownloadPipeline:
     @classmethod
     def from_crawler(cls, crawler) -> ImageDownloadPipeline:
         enabled = crawler.settings.getbool("DOWNLOAD_IMAGES", True)
-        image_dir = crawler.settings.get("IMAGES_STORE") or "data/member_a/images"
+        image_dir = crawler.settings.get("IMAGES_STORE") or "data/crawler/images"
         return cls(enabled, image_dir)
 
     def process_item(self, item, spider: Spider) -> Any:
@@ -108,7 +108,7 @@ class ImageDownloadPipeline:
         from requests_douban.config import CrawlConfig as _Cfg
         # Build a minimal config for image_downloader
         cfg = _Cfg(
-            image_dir=self.image_dir or Path("data/member_a/images"),
+            image_dir=self.image_dir or Path("data/crawler/images"),
             proxies=None,
             proxy_pool=(),
             user_agents=("Mozilla/5.0 (Windows NT 10.0; Win64; x64) ...",),
@@ -127,7 +127,7 @@ class ExportPipeline:
     """Accumulate items and write JSON + CSV on spider close.
 
     Output files are written to ``settings.EXPORT_DIR`` (default
-    ``data/member_a``) as ``douban_items.json`` and ``douban_items.csv``.
+    ``data/crawler``) as ``douban_items.json`` and ``douban_items.csv``.
     """
 
     def __init__(self, export_dir: str) -> None:
@@ -136,7 +136,7 @@ class ExportPipeline:
 
     @classmethod
     def from_crawler(cls, crawler) -> ExportPipeline:
-        export_dir = crawler.settings.get("EXPORT_DIR", "data/member_a")
+        export_dir = crawler.settings.get("EXPORT_DIR", "data/crawler")
         pipeline = cls(export_dir)
 
         # Connect to spider_closed signal

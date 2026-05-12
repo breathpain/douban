@@ -19,8 +19,8 @@ DEFAULT_USER_AGENTS = (
 class CrawlConfig:
     """Settings that keep scraping behavior polite and easy to tune."""
 
-    output_dir: Path = Path("data/member_a")
-    image_dir: Path = Path("data/member_a/images")
+    output_dir: Path = Path("data/crawler")
+    image_dir: Path = Path("data/crawler/images")
     request_timeout: int = 15
     retry_times: int = 3
     delay_min: float = 1.0
